@@ -6,7 +6,7 @@ use ratatui::{
     Frame,
 };
 
-use super::app::{AppState, PackageItem};
+use super::app::AppState;
 use crate::models::package::PackageRepository;
 
 pub fn render(frame: &mut Frame, state: &AppState) {
@@ -104,10 +104,9 @@ fn render_status(frame: &mut Frame, area: Rect, state: &AppState) {
     let (official, aur, ignored) = state.stats();
 
     let status_lines = vec![
-        Line::from(format!("Mode: Entire System (paru)")),
+        Line::from("Mode: Entire System (paru)".to_string()),
         Line::from(format!(
-            "Stats: Official ({}) | AUR ({}) | To Ignore: {}",
-            official, aur, ignored
+            "Stats: Official ({official}) | AUR ({aur}) | To Ignore: {ignored}"
         )),
     ];
 

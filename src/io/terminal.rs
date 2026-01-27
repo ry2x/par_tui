@@ -35,8 +35,8 @@ fn run_app(
             match (key.code, key.modifiers) {
                 (KeyCode::Char('q'), _) => return Ok(Some(UIEvent::Quit)),
                 (KeyCode::Char('?'), _) => state.toggle_help(),
-                (KeyCode::Char('j'), _) | (KeyCode::Down, _) => state.move_cursor_down(),
-                (KeyCode::Char('k'), _) | (KeyCode::Up, _) => state.move_cursor_up(),
+                (KeyCode::Char('j') | KeyCode::Down, _) => state.move_cursor_down(),
+                (KeyCode::Char('k') | KeyCode::Up, _) => state.move_cursor_up(),
                 (KeyCode::Char(' '), _) => state.toggle_current_package(),
                 (KeyCode::Enter, KeyModifiers::SHIFT) => {
                     return Ok(Some(UIEvent::UpdateOfficialOnly));

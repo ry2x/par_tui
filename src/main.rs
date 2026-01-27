@@ -22,21 +22,18 @@ fn main() {
     });
     let config_path = PathBuf::from(config_home).join("partui/config.toml");
 
-    let config = match file::read_config(&config_path) {
-        Ok(content) => match toml_parser::parse_config(&content) {
-            Ok(cfg) => {
-                println!("Config loaded from: {}", config_path.display());
-                cfg
-            }
-            Err(e) => {
-                println!("Config parse error: {:?}, using defaults", e);
-                models::config::Config::default()
-            }
-        },
-        Err(_) => {
-            println!("No config found, using defaults");
+    let config = if let Ok(content) = file::read_config(&config_path) { match toml_parser::parse_config(&content) {
+        Ok(cfg) => {
+            println!("Config loaded from: {}", config_path.display());
+            cfg
+        }
+        Err(e) => {
+            println!("Config parse error: {e:?}, using defaults");
             models::config::Config::default()
         }
+    } } else {
+        println!("No config found, using defaults");
+        models::config::Config::default()
     };
 
     // Check for required commands
@@ -60,7 +57,7 @@ fn main() {
             all_packages.extend(packages);
         }
         Err(e) => {
-            eprintln!("Warning: Could not scan official updates: {:?}", e);
+            eprintln!("Warning: Could not scan official updates: {e:?}");
         }
     }
 
@@ -72,7 +69,7 @@ fn main() {
                 all_packages.extend(packages);
             }
             Err(e) => {
-                eprintln!("Warning: Could not scan AUR updates: {:?}", e);
+                eprintln!("Warning: Could not scan AUR updates: {e:?}");
             }
         }
     }
@@ -107,7 +104,7 @@ fn main() {
             println!("\nNo action taken.");
         }
         Err(e) => {
-            eprintln!("\nTUI error: {}", e);
+            eprintln!("\nTUI error: {e}");
         }
     }
 }
@@ -146,7 +143,7 @@ fn execute_update(
             }
         }
         Err(e) => {
-            eprintln!("\n✗ Failed to execute update command: {}", e);
+            eprintln!("\n✗ Failed to execute update command: {e}");
         }
     }
 }

@@ -55,11 +55,10 @@ impl AppState {
     }
 
     pub fn toggle_current_package(&mut self) {
-        if let Some(item) = self.packages.get_mut(self.cursor_position) {
-            if !item.is_permanently_ignored {
+        if let Some(item) = self.packages.get_mut(self.cursor_position)
+            && !item.is_permanently_ignored {
                 item.is_temporarily_ignored = !item.is_temporarily_ignored;
             }
-        }
     }
 
     pub fn toggle_help(&mut self) {
