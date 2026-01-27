@@ -49,7 +49,6 @@ fn main() {
     // Scan for updates
     println!("Scanning for updates...\n");
     let mut all_packages = Vec::new();
-    let mut scan_errors = Vec::new();
 
     match command::run_checkupdates() {
         Ok(output) => {
@@ -58,9 +57,7 @@ fn main() {
             all_packages.extend(packages);
         }
         Err(e) => {
-            let error_msg = format!("Could not scan official updates: {e:?}");
-            eprintln!("Warning: {error_msg}");
-            scan_errors.push(error_msg);
+            eprintln!("Warning: Could not scan official updates: {e:?}");
         }
     }
 
@@ -72,38 +69,14 @@ fn main() {
                 all_packages.extend(packages);
             }
             Err(e) => {
-                let error_msg = format!("Could not scan AUR updates: {e:?}");
-                eprintln!("Warning: {error_msg}");
-                scan_errors.push(error_msg);
+                eprintln!("Warning: Could not scan AUR updates: {e:?}");
             }
         }
     }
 
     if all_packages.is_empty() {
-        if scan_errors.is_empty() {
-            println!("\nSystem is up to date!");
-        } else {
-            println!("\nNo packages found due to scan errors:");
-            for error in &scan_errors {
-                println!("  - {error}");
-            }
-        }
+        println!("\nSystem is up to date!");
         return;
-    }
-
-    // Show warnings before TUI
-    if !scan_errors.is_empty() {
-        println!("\n⚠ Warning: Some scans failed:");
-        for error in &scan_errors {
-            println!("  - {error}");
-        }
-        println!("\nProceed with available updates? [y/N]");
-        let mut input = String::new();
-        std::io::stdin().read_line(&mut input).ok();
-        if !input.trim().eq_ignore_ascii_case("y") {
-            println!("Aborted.");
-            return;
-        }
     }
 
     // Launch TUI

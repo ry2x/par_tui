@@ -31,10 +31,9 @@ pub fn render(frame: &mut Frame, state: &AppState) {
 }
 
 fn render_header(frame: &mut Frame, area: Rect, state: &AppState) {
-    let (official, aur, _) = state.stats();
     let title = format!(
-        "par_tui - Updates: {} Official, {} AUR         [Help: ?]",
-        official, aur
+        "par_tui - [Updates Found: {}]                     [Help: ?]",
+        state.packages.len()
     );
     let header = Paragraph::new(title)
         .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
