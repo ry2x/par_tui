@@ -1,0 +1,20 @@
+use crate::models::package::{Package, PackageRepository};
+
+pub fn parse_paru_output(output: &str) -> Vec<Package> {
+    output
+        .lines()
+        .filter_map(|line| {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 4 {
+                Some(Package {
+                    name: parts[0].to_string(),
+                    current_version: Some(parts[1].to_string()),
+                    new_version: parts[3].to_string(),
+                    repository: PackageRepository::Aur,
+                })
+            } else {
+                None
+            }
+        })
+        .collect()
+}
