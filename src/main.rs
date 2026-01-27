@@ -13,8 +13,14 @@ fn main() {
     println!("par_tui - Arch Linux Update Manager\n");
 
     // Load config
-    let config_path = PathBuf::from(std::env::var("HOME").unwrap_or_default())
-        .join(".config/par_tui/config.toml");
+    let config_home = std::env::var("XDG_CONFIG_HOME")
+        .unwrap_or_else(|_| {
+            PathBuf::from(std::env::var("HOME").unwrap_or_default())
+                .join(".config")
+                .to_string_lossy()
+                .to_string()
+        });
+    let config_path = PathBuf::from(config_home).join("partui/config.toml");
     
     let config = match file::read_config(&config_path) {
         Ok(content) => match toml_parser::parse_config(&content) {
