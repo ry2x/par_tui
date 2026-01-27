@@ -1,3 +1,7 @@
+---
+applyTo: '**/*.rs'
+---
+
 # TUI Design Specification: `par_tui`
 
 This document defines the **terminal user interface (TUI) architecture, layout, and interaction rules** for `par_tui`.
