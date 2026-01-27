@@ -8,7 +8,7 @@ use std::io;
 
 use crate::ui::{app::{AppState, UIEvent}, view};
 
-pub fn run_tui(mut state: AppState) -> io::Result<Option<UIEvent>> {
+pub fn run_tui(mut state: AppState) -> io::Result<(Option<UIEvent>, AppState)> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
@@ -21,7 +21,7 @@ pub fn run_tui(mut state: AppState) -> io::Result<Option<UIEvent>> {
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal.show_cursor()?;
 
-    result
+    result.map(|event| (event, state))
 }
 
 fn run_app(

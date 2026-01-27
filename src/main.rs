@@ -4,7 +4,7 @@ mod models;
 mod parser;
 mod ui;
 
-use core::{filter, planner};
+use core::planner::{self, UpdateMode};
 use io::{command, file, terminal};
 use parser::{pacman, paru, toml as toml_parser};
 use std::path::PathBuf;
@@ -84,17 +84,17 @@ fn main() {
 
     // Launch TUI
     println!("\nLaunching TUI...");
-    let state = AppState::new(all_packages, &config.exclude.permanent);
+    let state = AppState::new(all_packages.clone(), &config.exclude.permanent);
 
     match terminal::run_tui(state) {
-        Ok(Some(event)) => match event {
+        Ok((Some(event), final_state)) => match event {
             UIEvent::UpdateEntireSystem => {
-                println!("\nPreparing entire system update...");
-                // TODO: Execute paru command
+                let ignored = final_state.get_ignored_packages();
+                execute_update(UpdateMode::EntireSystem, all_packages, ignored, &config);
             }
             UIEvent::UpdateOfficialOnly => {
-                println!("\nPreparing official-only update...");
-                // TODO: Execute pacman command
+                let ignored = final_state.get_ignored_packages();
+                execute_update(UpdateMode::OfficialOnly, all_packages, ignored, &config);
             }
             UIEvent::Quit => {
                 println!("\nExiting without updates.");
@@ -103,11 +103,50 @@ fn main() {
                 println!("\nLink opening not yet implemented.");
             }
         },
-        Ok(None) => {
+        Ok((None, _)) => {
             println!("\nNo action taken.");
         }
         Err(e) => {
             eprintln!("\nTUI error: {}", e);
+        }
+    }
+}
+
+fn execute_update(
+    mode: UpdateMode,
+    packages: Vec<models::package::Package>,
+    ignored: Vec<String>,
+    config: &models::config::Config,
+) {
+    let plan = planner::create_plan(mode, packages, ignored);
+    let cmd = plan.build_command(config);
+
+    println!("\n{}", "=".repeat(60));
+    println!("Executing: {}", cmd.join(" "));
+    println!("{}", "=".repeat(60));
+
+    // Dry-run check
+    if std::env::var("PAR_TUI_DRY_RUN").is_ok() {
+        println!("\n[DRY RUN] Would execute: {}", cmd.join(" "));
+        println!("Ignored packages: {:?}", plan.ignore_list);
+        return;
+    }
+
+    println!();
+
+    match plan.execute(config) {
+        Ok(status) => {
+            if status.success() {
+                println!("\n✓ Update completed successfully!");
+            } else {
+                eprintln!(
+                    "\n✗ Update failed with exit code: {}",
+                    status.code().unwrap_or(-1)
+                );
+            }
+        }
+        Err(e) => {
+            eprintln!("\n✗ Failed to execute update command: {}", e);
         }
     }
 }
