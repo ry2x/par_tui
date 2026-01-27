@@ -101,6 +101,8 @@ warn_stale_system = true
 extra_args = ["--noconfirm"]
 ```
 
+Configuration file is in ~/.config/partui ($XDG_CONFIG_HOME).
+
 ---
 
 ## 6. Technology Stack (Fixed)
