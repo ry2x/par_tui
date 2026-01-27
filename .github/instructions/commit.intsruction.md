@@ -1,3 +1,7 @@
+---
+excludeAgent: ["code-review"]
+---
+
 # 🛠 Commit Message Instructions (A.G.E.N.T.)
 
 This document defines the commit message rules for this repository.  
