@@ -121,14 +121,6 @@ fn execute_update(
     println!("\n{}", "=".repeat(60));
     println!("Executing: {}", cmd.join(" "));
     println!("{}", "=".repeat(60));
-
-    // Dry-run check
-    if std::env::var("PAR_TUI_DRY_RUN").is_ok() {
-        println!("\n[DRY RUN] Would execute: {}", cmd.join(" "));
-        println!("Ignored packages: {:?}", plan.ignore_list);
-        return;
-    }
-
     println!();
 
     match plan.execute(config) {
