@@ -1,5 +1,9 @@
 use crate::models::package::{Package, PackageRepository};
 
+/// Parses `paru -Qua` command output into a list of AUR packages.
+///
+/// Expected format: `package_name current_version -> new_version`
+#[must_use]
 pub fn parse_paru_output(output: &str) -> Vec<Package> {
     output
         .lines()

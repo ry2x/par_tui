@@ -1,5 +1,9 @@
 use crate::models::package::{Package, PackageRepository};
 
+/// Parses `checkupdates` command output into a list of packages.
+///
+/// Expected format: `package_name current_version -> new_version`
+#[must_use]
 pub fn parse_checkupdates_output(output: &str) -> Vec<Package> {
     output
         .lines()

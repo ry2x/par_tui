@@ -6,6 +6,12 @@ pub enum CommandError {
     NotFound(String),
 }
 
+/// Runs `checkupdates` to scan for official package updates.
+///
+/// # Errors
+///
+/// Returns `CommandError::ExecutionFailed` if the command fails to execute
+/// or returns a non-zero exit status (except exit code 2, which means no updates).
 pub fn run_checkupdates() -> Result<String, CommandError> {
     let output = Command::new("checkupdates")
         .output()
@@ -20,6 +26,12 @@ pub fn run_checkupdates() -> Result<String, CommandError> {
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
+/// Runs `paru -Qua` to query AUR package updates.
+///
+/// # Errors
+///
+/// Returns `CommandError::ExecutionFailed` if the command fails to execute
+/// or returns a non-zero exit status.
 pub fn run_paru_query_aur() -> Result<String, CommandError> {
     let output = Command::new("paru")
         .args(["-Qua"])
@@ -35,6 +47,8 @@ pub fn run_paru_query_aur() -> Result<String, CommandError> {
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
+/// Checks if a command exists in PATH using `which`.
+#[must_use]
 pub fn check_command_exists(command: &str) -> bool {
     Command::new("which")
         .arg(command)

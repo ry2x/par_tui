@@ -22,6 +22,8 @@ pub struct PackageItem {
 }
 
 impl AppState {
+    /// Creates a new `AppState` with the given packages and permanent exclusions.
+    #[must_use]
     pub fn new(packages: Vec<Package>, permanent_excludes: &[String]) -> Self {
         let items = packages
             .into_iter()
@@ -65,6 +67,8 @@ impl AppState {
         self.show_help = !self.show_help;
     }
 
+    /// Returns a list of all ignored package names (temporary + permanent).
+    #[must_use]
     pub fn get_ignored_packages(&self) -> Vec<String> {
         self.packages
             .iter()
@@ -73,6 +77,8 @@ impl AppState {
             .collect()
     }
 
+    /// Returns package statistics: (`official_count`, `aur_count`, `ignored_count`).
+    #[must_use]
     pub fn stats(&self) -> (usize, usize, usize) {
         let official = self
             .packages

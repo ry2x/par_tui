@@ -14,6 +14,10 @@ pub struct UpdatePlan {
 }
 
 impl UpdatePlan {
+    /// Builds the command-line arguments for the update.
+    ///
+    /// Returns a vector of command parts including the program name and all arguments.
+    #[must_use]
     pub fn build_command(&self, config: &Config) -> Vec<String> {
         let mut cmd = match self.mode {
             UpdateMode::EntireSystem => vec!["paru".to_string(), "-Syu".to_string()],
@@ -31,6 +35,11 @@ impl UpdatePlan {
         cmd
     }
 
+    /// Executes the update command with inherited stdio.
+    ///
+    /// # Errors
+    ///
+    /// Returns an I/O error if the command fails to execute.
     pub fn execute(&self, config: &Config) -> std::io::Result<std::process::ExitStatus> {
         let cmd_parts = self.build_command(config);
         let program = &cmd_parts[0];
@@ -45,6 +54,10 @@ impl UpdatePlan {
     }
 }
 
+/// Creates an update plan with the specified mode and exclusions.
+///
+/// For `OfficialOnly` mode, AUR packages are automatically filtered out.
+#[must_use]
 pub fn create_plan(
     mode: UpdateMode,
     all_packages: Vec<Package>,

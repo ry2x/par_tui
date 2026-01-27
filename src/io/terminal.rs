@@ -8,6 +8,11 @@ use std::io;
 
 use crate::ui::{app::{AppState, UIEvent}, view};
 
+/// Runs the TUI and returns the user's selected action and final state.
+///
+/// # Errors
+///
+/// Returns an I/O error if terminal operations fail.
 pub fn run_tui(mut state: AppState) -> io::Result<(Option<UIEvent>, AppState)> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
