@@ -12,3 +12,5 @@ float_cmp = "deny"
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.8"
+ratatui = "0.29"
+crossterm = "0.28"
