@@ -73,7 +73,7 @@ fn render_no_updates(frame: &mut Frame) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Percentage(40),
-            Constraint::Length(3),
+            Constraint::Length(6), // 4 lines + 2 borders
             Constraint::Percentage(40),
         ])
         .split(area);
@@ -104,7 +104,7 @@ fn render_error(frame: &mut Frame, error: &str) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Percentage(40),
-            Constraint::Length(5),
+            Constraint::Length(8), // 6 lines + 2 borders
             Constraint::Percentage(40),
         ])
         .split(area);
@@ -134,7 +134,8 @@ fn get_spinner() -> &'static str {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis();
-    let frame = (now / 80) % SPINNER_FRAMES.len() as u128;
+    // Match 100ms polling interval for smooth animation
+    let frame = (now / 100) % SPINNER_FRAMES.len() as u128;
     SPINNER_FRAMES[frame as usize]
 }
 
@@ -142,10 +143,10 @@ fn render_main(frame: &mut Frame, state: &AppState) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1),
-            Constraint::Min(0),
-            Constraint::Length(3),
-            Constraint::Length(1),
+            Constraint::Length(1), // Header
+            Constraint::Min(0),    // Package list
+            Constraint::Length(3), // Status (2 borders + 1 content line)
+            Constraint::Length(1), // Keybinds
         ])
         .split(frame.area());
 

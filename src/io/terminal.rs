@@ -56,8 +56,10 @@ pub fn run_tui_with_scan(
     // Signal thread to stop if still running
     cancel_flag.store(true, Ordering::Relaxed);
 
-    // Wait for thread to complete (with timeout to avoid hanging)
-    let _ = scan_handle.join();
+    // Wait for thread to complete and detect panics
+    if scan_handle.join().is_err() {
+        eprintln!("Warning: Scan thread panicked during execution.");
+    }
 
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
