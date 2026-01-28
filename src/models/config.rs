@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct Config {
     #[serde(default)]
     pub exclude: ExcludeConfig,
@@ -31,7 +30,6 @@ impl Default for BehaviorConfig {
         }
     }
 }
-
 
 fn default_warn_stale_system() -> bool {
     true

@@ -1,12 +1,15 @@
 use crossterm::{
     event::{self, Event, KeyCode, KeyModifiers},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui::{Terminal, backend::CrosstermBackend};
 use std::io;
 
-use crate::ui::{app::{AppState, UIEvent}, view};
+use crate::ui::{
+    app::{AppState, UIEvent},
+    view,
+};
 
 /// Runs the TUI and returns the user's selected action and final state.
 ///
@@ -45,11 +48,11 @@ fn run_app(
                 (KeyCode::Char(' '), _) => state.toggle_current_package(),
                 (KeyCode::Enter, KeyModifiers::SHIFT) => {
                     return Ok(Some(UIEvent::UpdateOfficialOnly));
-                }
+                },
                 (KeyCode::Enter, _) => {
                     return Ok(Some(UIEvent::UpdateEntireSystem));
-                }
-                _ => {}
+                },
+                _ => {},
             }
         }
     }

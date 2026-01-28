@@ -1,4 +1,4 @@
-use par_tui::core::planner::{create_plan, UpdateMode};
+use par_tui::core::planner::{UpdateMode, create_plan};
 use par_tui::models::config::Config;
 use par_tui::models::package::{Package, PackageRepository};
 
@@ -35,10 +35,11 @@ fn test_create_plan_official_only() {
     let plan = create_plan(UpdateMode::OfficialOnly, packages, vec![]);
 
     assert_eq!(plan.packages.len(), 2);
-    assert!(plan
-        .packages
-        .iter()
-        .all(|p| p.repository == PackageRepository::Official));
+    assert!(
+        plan.packages
+            .iter()
+            .all(|p| p.repository == PackageRepository::Official)
+    );
 }
 
 #[test]

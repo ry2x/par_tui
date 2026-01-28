@@ -1,4 +1,4 @@
-use par_tui::core::planner::{create_plan, UpdateMode};
+use par_tui::core::planner::{UpdateMode, create_plan};
 use par_tui::models::config::Config;
 use par_tui::models::package::{Package, PackageRepository};
 
