@@ -7,10 +7,20 @@ pub enum UIEvent {
     Quit,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum LoadingState {
+    Scanning,
+    Ready,
+    NoUpdates,
+    Error(String),
+}
+
 pub struct AppState {
     pub packages: Vec<PackageItem>,
     pub cursor_position: usize,
     pub show_help: bool,
+    pub loading_state: LoadingState,
+    pub loading_message: String,
 }
 
 #[derive(Debug, Clone)]
@@ -21,6 +31,18 @@ pub struct PackageItem {
 }
 
 impl AppState {
+    /// Creates a new `AppState` in loading state.
+    #[must_use]
+    pub fn new_loading() -> Self {
+        Self {
+            packages: Vec::new(),
+            cursor_position: 0,
+            show_help: false,
+            loading_state: LoadingState::Scanning,
+            loading_message: "Initializing...".to_string(),
+        }
+    }
+
     /// Creates a new `AppState` with the given packages and permanent exclusions.
     #[must_use]
     pub fn new(packages: Vec<Package>, permanent_excludes: &[String]) -> Self {
@@ -40,7 +62,37 @@ impl AppState {
             packages: items,
             cursor_position: 0,
             show_help: false,
+            loading_state: LoadingState::Ready,
+            loading_message: String::new(),
         }
+    }
+
+    pub fn set_loading_message(&mut self, message: String) {
+        self.loading_message = message;
+    }
+
+    pub fn set_packages(&mut self, packages: Vec<Package>, permanent_excludes: &[String]) {
+        let items = packages
+            .into_iter()
+            .map(|pkg| {
+                let is_perm = permanent_excludes.contains(&pkg.name);
+                PackageItem {
+                    package: pkg,
+                    is_temporarily_ignored: false,
+                    is_permanently_ignored: is_perm,
+                }
+            })
+            .collect();
+        self.packages = items;
+        self.loading_state = LoadingState::Ready;
+    }
+
+    pub fn set_no_updates(&mut self) {
+        self.loading_state = LoadingState::NoUpdates;
+    }
+
+    pub fn set_error(&mut self, error: String) {
+        self.loading_state = LoadingState::Error(error);
     }
 
     pub fn move_cursor_up(&mut self) {
