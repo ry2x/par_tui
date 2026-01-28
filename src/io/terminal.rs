@@ -65,7 +65,14 @@ fn start_scan_thread(tx: Sender<ScanMessage>, has_paru: bool) {
             "Scanning official repositories...".to_string(),
         ));
 
-        match command::run_checkupdates() {
+        let tx_clone = tx.clone();
+        match command::run_checkupdates_with_callback(|attempt, max| {
+            let _ = tx_clone.send(ScanMessage::Progress(format!(
+                "Retrying checkupdates (attempt {}/{})",
+                attempt + 1,
+                max
+            )));
+        }) {
             Ok(output) => {
                 let packages = pacman::parse_checkupdates_output(&output);
                 let count = packages.len();
