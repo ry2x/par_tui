@@ -161,10 +161,16 @@ fn render_main(frame: &mut Frame, state: &AppState) {
 }
 
 fn render_header(frame: &mut Frame, area: Rect, state: &AppState) {
-    let title = format!(
-        "par_tui - [Updates Found: {}]                     [Help: ?]",
-        state.packages.len()
-    );
+    let left_text = format!("par_tui - [Updates Found: {}]", state.packages.len());
+    let right_text = "[Help: ?]";
+
+    let available_space = area.width as usize;
+    let padding = available_space
+        .saturating_sub(left_text.len())
+        .saturating_sub(right_text.len());
+
+    let title = format!("{}{}{}", left_text, " ".repeat(padding), right_text);
+
     let header = Paragraph::new(title).style(
         Style::default()
             .fg(Color::Cyan)
