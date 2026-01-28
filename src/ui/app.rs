@@ -8,6 +8,7 @@ pub enum UIEvent {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub enum LoadingState {
     Scanning,
     Ready,
@@ -47,6 +48,7 @@ impl AppState {
 
     /// Creates a new `AppState` with the given packages and permanent exclusions.
     #[must_use]
+    #[allow(dead_code)]
     pub fn new(packages: Vec<Package>, permanent_excludes: &[String]) -> Self {
         let items = Self::create_package_items(packages, permanent_excludes);
 
@@ -73,7 +75,7 @@ impl AppState {
         self.loading_state = LoadingState::Ready;
     }
 
-    /// Helper to create PackageItem list from packages and permanent exclusions
+    /// Helper to create `PackageItem` list from packages and permanent exclusions
     fn create_package_items(
         packages: Vec<Package>,
         permanent_excludes: &[String],
@@ -95,6 +97,7 @@ impl AppState {
         self.loading_state = LoadingState::NoUpdates;
     }
 
+    #[allow(dead_code)]
     pub fn set_error<S: Into<String>>(&mut self, error: S) {
         self.loading_state = LoadingState::Error(error.into());
     }

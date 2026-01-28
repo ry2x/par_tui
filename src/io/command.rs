@@ -5,8 +5,20 @@ use std::time::Duration;
 #[derive(Debug)]
 pub enum CommandError {
     ExecutionFailed(String),
+    #[allow(dead_code)]
     NotFound(String),
 }
+
+impl std::fmt::Display for CommandError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ExecutionFailed(msg) => write!(f, "Command execution failed: {msg}"),
+            Self::NotFound(msg) => write!(f, "Command not found: {msg}"),
+        }
+    }
+}
+
+impl std::error::Error for CommandError {}
 
 /// Runs `checkupdates` to scan for official package updates with retry logic.
 ///
@@ -57,6 +69,7 @@ where
 ///
 /// Returns `CommandError::ExecutionFailed` if the command fails to execute
 /// or returns a non-zero exit status after all retries (except exit code 2, which means no updates).
+#[allow(dead_code)]
 pub fn run_checkupdates() -> Result<String, CommandError> {
     run_checkupdates_with_callback(|_, _| {})
 }

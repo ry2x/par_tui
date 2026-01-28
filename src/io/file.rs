@@ -2,11 +2,24 @@ use std::fs;
 use std::path::Path;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum FileError {
     ReadFailed(String),
     WriteFailed(String),
     NotFound,
 }
+
+impl std::fmt::Display for FileError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ReadFailed(msg) => write!(f, "Failed to read file: {msg}"),
+            Self::WriteFailed(msg) => write!(f, "Failed to write file: {msg}"),
+            Self::NotFound => write!(f, "File not found"),
+        }
+    }
+}
+
+impl std::error::Error for FileError {}
 
 /// Reads configuration file from the given path.
 ///

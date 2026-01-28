@@ -99,8 +99,7 @@ fn start_scan_thread(
         let tx_clone = tx.clone();
         match command::run_checkupdates_with_callback(|attempt, max| {
             let _ = tx_clone.send(ScanMessage::Progress(format!(
-                "Retrying checkupdates (attempt {}/{})",
-                attempt, max
+                "Retrying checkupdates (attempt {attempt}/{max})"
             )));
         }) {
             Ok(output) => {

@@ -242,9 +242,7 @@ fn render_package_list(frame: &mut Frame, area: Rect, state: &AppState) {
     let total_items = state.packages.len();
 
     // Calculate offset to keep cursor visible
-    let offset = if total_items <= visible_height {
-        0
-    } else if state.cursor_position < visible_height / 2 {
+    let offset = if total_items <= visible_height || state.cursor_position < visible_height / 2 {
         0
     } else if state.cursor_position >= total_items - visible_height / 2 {
         total_items.saturating_sub(visible_height)

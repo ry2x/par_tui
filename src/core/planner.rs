@@ -9,6 +9,7 @@ pub enum UpdateMode {
 
 pub struct UpdatePlan {
     pub mode: UpdateMode,
+    #[allow(dead_code)]
     pub packages: Vec<Package>,
     pub ignore_list: Vec<String>,
 }
