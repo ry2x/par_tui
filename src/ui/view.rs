@@ -6,17 +6,147 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
 };
 
-use super::app::AppState;
+use super::app::{AppState, LoadingState};
 use crate::models::package::PackageRepository;
 
 pub fn render(frame: &mut Frame, state: &AppState) {
+    match &state.loading_state {
+        LoadingState::Scanning => render_loading(frame, state),
+        LoadingState::Ready => render_main(frame, state),
+        LoadingState::NoUpdates => render_no_updates(frame),
+        LoadingState::Error(err) => render_error(frame, err),
+    }
+}
+
+fn render_loading(frame: &mut Frame, state: &AppState) {
+    let area = frame.area();
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1),
-            Constraint::Min(0),
-            Constraint::Length(2),
-            Constraint::Length(1),
+            Constraint::Percentage(35),
+            Constraint::Length(9),
+            Constraint::Percentage(35),
+        ])
+        .split(area);
+
+    let spinner = get_spinner();
+    let text = vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled(
+                spinner,
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw("  "),
+            Span::styled(&state.loading_message, Style::default().fg(Color::White)),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Please wait...",
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Press [q] to quit",
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::from(""),
+    ];
+
+    let paragraph = Paragraph::new(text).alignment(Alignment::Center).block(
+        Block::default().borders(Borders::ALL).title(Span::styled(
+            "Scanning for Updates",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )),
+    );
+
+    frame.render_widget(paragraph, chunks[1]);
+}
+
+fn render_no_updates(frame: &mut Frame) {
+    let area = frame.area();
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage(40),
+            Constraint::Length(6), // 4 lines + 2 borders
+            Constraint::Percentage(40),
+        ])
+        .split(area);
+
+    let text = vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            "✓ System is up to date!",
+            Style::default().fg(Color::Green),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Press q to quit",
+            Style::default().fg(Color::DarkGray),
+        )),
+    ];
+
+    let paragraph = Paragraph::new(text)
+        .alignment(Alignment::Center)
+        .block(Block::default().borders(Borders::ALL));
+
+    frame.render_widget(paragraph, chunks[1]);
+}
+
+fn render_error(frame: &mut Frame, error: &str) {
+    let area = frame.area();
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage(40),
+            Constraint::Length(8), // 6 lines + 2 borders
+            Constraint::Percentage(40),
+        ])
+        .split(area);
+
+    let text = vec![
+        Line::from(""),
+        Line::from(Span::styled("✗ Error", Style::default().fg(Color::Red))),
+        Line::from(""),
+        Line::from(error),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Press q to quit",
+            Style::default().fg(Color::DarkGray),
+        )),
+    ];
+
+    let paragraph = Paragraph::new(text)
+        .alignment(Alignment::Center)
+        .block(Block::default().borders(Borders::ALL).title("Scan Failed"));
+
+    frame.render_widget(paragraph, chunks[1]);
+}
+
+fn get_spinner() -> &'static str {
+    const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    // Match 100ms polling interval for smooth animation
+    let frame = (now / 100) % SPINNER_FRAMES.len() as u128;
+    SPINNER_FRAMES[frame as usize]
+}
+
+fn render_main(frame: &mut Frame, state: &AppState) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1), // Header
+            Constraint::Min(0),    // Package list
+            Constraint::Length(3), // Status (2 borders + 1 content line)
+            Constraint::Length(1), // Keybinds
         ])
         .split(frame.area());
 
@@ -108,14 +238,15 @@ fn render_package_list(frame: &mut Frame, area: Rect, state: &AppState) {
 fn render_status(frame: &mut Frame, area: Rect, state: &AppState) {
     let (official, aur, ignored) = state.stats();
 
-    let status_lines = vec![
-        Line::from("Mode: Entire System (paru)".to_string()),
-        Line::from(format!(
-            "Stats: Official ({official}) | AUR ({aur}) | To Ignore: {ignored}"
-        )),
-    ];
+    let stats_text = format!("Stats: Official ({official}) | AUR ({aur}) | To Ignore: {ignored}");
 
-    let status = Paragraph::new(status_lines).block(Block::default().borders(Borders::ALL));
+    let status_line = if state.scan_warnings.is_empty() {
+        stats_text
+    } else {
+        format!("{} | ⚠ {}", stats_text, state.scan_warnings.join(", "))
+    };
+
+    let status = Paragraph::new(status_line).block(Block::default().borders(Borders::ALL));
     frame.render_widget(status, area);
 }
 

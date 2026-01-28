@@ -7,10 +7,21 @@ pub enum UIEvent {
     Quit,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum LoadingState {
+    Scanning,
+    Ready,
+    NoUpdates,
+    Error(String),
+}
+
 pub struct AppState {
     pub packages: Vec<PackageItem>,
     pub cursor_position: usize,
     pub show_help: bool,
+    pub loading_state: LoadingState,
+    pub loading_message: String,
+    pub scan_warnings: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -21,10 +32,53 @@ pub struct PackageItem {
 }
 
 impl AppState {
+    /// Creates a new `AppState` in loading state.
+    #[must_use]
+    pub fn new_loading() -> Self {
+        Self {
+            packages: Vec::new(),
+            cursor_position: 0,
+            show_help: false,
+            loading_state: LoadingState::Scanning,
+            loading_message: "Initializing...".to_string(),
+            scan_warnings: Vec::new(),
+        }
+    }
+
     /// Creates a new `AppState` with the given packages and permanent exclusions.
     #[must_use]
     pub fn new(packages: Vec<Package>, permanent_excludes: &[String]) -> Self {
-        let items = packages
+        let items = Self::create_package_items(packages, permanent_excludes);
+
+        Self {
+            packages: items,
+            cursor_position: 0,
+            show_help: false,
+            loading_state: LoadingState::Ready,
+            loading_message: String::new(),
+            scan_warnings: Vec::new(),
+        }
+    }
+
+    pub fn set_loading_message<S: Into<String>>(&mut self, message: S) {
+        self.loading_message = message.into();
+    }
+
+    pub fn add_scan_warning<S: Into<String>>(&mut self, warning: S) {
+        self.scan_warnings.push(warning.into());
+    }
+
+    pub fn set_packages(&mut self, packages: Vec<Package>, permanent_excludes: &[String]) {
+        self.packages = Self::create_package_items(packages, permanent_excludes);
+        self.loading_state = LoadingState::Ready;
+    }
+
+    /// Helper to create PackageItem list from packages and permanent exclusions
+    fn create_package_items(
+        packages: Vec<Package>,
+        permanent_excludes: &[String],
+    ) -> Vec<PackageItem> {
+        packages
             .into_iter()
             .map(|pkg| {
                 let is_perm = permanent_excludes.contains(&pkg.name);
@@ -34,13 +88,15 @@ impl AppState {
                     is_permanently_ignored: is_perm,
                 }
             })
-            .collect();
+            .collect()
+    }
 
-        Self {
-            packages: items,
-            cursor_position: 0,
-            show_help: false,
-        }
+    pub fn set_no_updates(&mut self) {
+        self.loading_state = LoadingState::NoUpdates;
+    }
+
+    pub fn set_error<S: Into<String>>(&mut self, error: S) {
+        self.loading_state = LoadingState::Error(error.into());
     }
 
     pub fn move_cursor_up(&mut self) {

@@ -17,7 +17,7 @@ The UI layer is split by file responsibility:
 * **`ui/app.rs` (State & Controller)**
 
   * Receives user input
-  * Manages UI state (cursor position, temporary ignore list, modal visibility)
+  * Manages UI state (cursor position, temporary ignore list, modal visibility, loading state)
   * Emits UI events
 
 * **`ui/view.rs` (Renderer)**
@@ -28,7 +28,7 @@ The UI layer is split by file responsibility:
 
 **Strictly Forbidden**:
 
-* Calling `io/*` directly from any UI file
+* Calling `io/*` directly from any UI file (except `io/terminal`)
 * Executing system commands
 * Making business decisions
 
@@ -36,11 +36,38 @@ The UI layer is split by file responsibility:
 
 ---
 
+## 1.1 Loading States
+
+The TUI supports multiple states managed by `LoadingState` enum:
+
+* **`Scanning`**: Initial loading with spinner animation while scanning packages
+* **`Ready`**: Normal operation with package list
+* **`NoUpdates`**: System is up to date message
+* **`Error(String)`**: Display error message
+
+View layer (`ui/view.rs`) renders different screens based on `LoadingState`.
+
+---
+
+## 1.2 Async Scanning Architecture
+
+The TUI launches immediately in `Scanning` state:
+
+1. **TUI starts** with loading screen and spinner
+2. **Background thread** scans packages via `std::thread::spawn`
+3. **Message passing** via `std::sync::mpsc::channel`
+4. **Event loop** polls for both keyboard input and scan messages
+5. **State transition** from `Scanning` to `Ready`/`NoUpdates`/`Error`
+
+**Implementation**: `io/terminal.rs` handles async coordination.
+
+---
+
 ## 2. Main Screen Layout
 
 The main screen uses a **three-pane layout** optimized for fast scanning and keyboard-only interaction.
 
-### 2.1 Screen Mockup
+### 2.1 Screen Mockup (Ready State)
 
 ```text
 +-------------------------------------------------------------+
@@ -52,12 +79,25 @@ The main screen uses a **three-pane layout** optimized for fast scanning and key
 |   [ ] [AUR]      yay                12.0.1 -> 12.0.2        |
 |   ...                                                       |
 +-------------------------------------------------------------+
-| Mode: Entire System (paru)                                  |
 | Stats: Official (10) | AUR (4) | To Ignore: 1               |
 +-------------------------------------------------------------+
-| [Enter] Entire  [S-Enter] Official Only  [Space] Toggle  [q] |
+| [Enter] Entire  [o] Official  [Space] Toggle  [p] Perm  [q] |
 +-------------------------------------------------------------+
 ```
+
+### 2.2 Loading Screen Mockup
+
+```text
++-------------------------------------------------------------+
+|                    Scanning for Updates                     |
++-------------------------------------------------------------+
+|                                                             |
+|                  ⠋  Scanning official repositories...        |
+|                                                             |
++-------------------------------------------------------------+
+```
+
+Spinner animation cycles through: `⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏`
 
 ---
 

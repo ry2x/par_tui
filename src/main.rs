@@ -6,13 +6,11 @@ mod ui;
 
 use core::planner::{self, UpdateMode};
 use io::{command, file, terminal};
-use parser::{pacman, paru, toml as toml_parser};
+use parser::toml as toml_parser;
 use std::path::PathBuf;
-use ui::app::{AppState, UIEvent};
+use ui::app::UIEvent;
 
 fn main() {
-    println!("par_tui - Arch Linux Update Manager\n");
-
     // Load config
     let config_home = std::env::var("XDG_CONFIG_HOME").unwrap_or_else(|_| {
         PathBuf::from(std::env::var("HOME").unwrap_or_default())
@@ -24,68 +22,24 @@ fn main() {
 
     let config = if let Ok(content) = file::read_config(&config_path) {
         match toml_parser::parse_config(&content) {
-            Ok(cfg) => {
-                println!("Config loaded from: {}", config_path.display());
-                cfg
-            },
-            Err(e) => {
-                println!("Config parse error: {e:?}, using defaults");
-                models::config::Config::default()
-            },
+            Ok(cfg) => cfg,
+            Err(_) => models::config::Config::default(),
         }
     } else {
-        println!("No config found, using defaults");
         models::config::Config::default()
     };
 
     // Check for required commands
-    println!("Checking for required commands...");
     let has_checkupdates = command::check_command_exists("checkupdates");
     let has_paru = command::check_command_exists("paru");
 
     if !has_checkupdates {
-        eprintln!("\nError: checkupdates not found. Install pacman-contrib.");
+        eprintln!("Error: checkupdates not found. Install pacman-contrib.");
         return;
     }
 
-    // Scan for updates
-    println!("Scanning for updates...\n");
-    let mut all_packages = Vec::new();
-
-    match command::run_checkupdates() {
-        Ok(output) => {
-            let packages = pacman::parse_checkupdates_output(&output);
-            println!("Found {} official updates", packages.len());
-            all_packages.extend(packages);
-        },
-        Err(e) => {
-            eprintln!("Warning: Could not scan official updates: {e:?}");
-        },
-    }
-
-    if has_paru {
-        match command::run_paru_query_aur() {
-            Ok(output) => {
-                let packages = paru::parse_paru_output(&output);
-                println!("Found {} AUR updates", packages.len());
-                all_packages.extend(packages);
-            },
-            Err(e) => {
-                eprintln!("Warning: Could not scan AUR updates: {e:?}");
-            },
-        }
-    }
-
-    if all_packages.is_empty() {
-        println!("\nSystem is up to date!");
-        return;
-    }
-
-    // Launch TUI
-    println!("\nLaunching TUI...");
-    let state = AppState::new(all_packages.clone(), &config.exclude.permanent);
-
-    match terminal::run_tui(state) {
+    // Launch TUI with async scanning
+    match terminal::run_tui_with_scan(&config, has_paru) {
         Ok((Some(event), final_state)) => {
             // Save permanent excludes if changed
             let new_permanent = final_state.get_permanent_excludes();
@@ -106,6 +60,13 @@ fn main() {
                 }
             }
 
+            // Get all packages from final state
+            let all_packages: Vec<models::package::Package> = final_state
+                .packages
+                .iter()
+                .map(|item| item.package.clone())
+                .collect();
+
             match event {
                 UIEvent::UpdateEntireSystem => {
                     let ignored = final_state.get_ignored_packages();
@@ -115,16 +76,12 @@ fn main() {
                     let ignored = final_state.get_ignored_packages();
                     execute_update(UpdateMode::OfficialOnly, all_packages, ignored, &config);
                 },
-                UIEvent::Quit => {
-                    println!("\nExiting without updates.");
-                },
+                UIEvent::Quit => {},
             }
         },
-        Ok((None, _)) => {
-            println!("\nNo action taken.");
-        },
+        Ok((None, _)) => {},
         Err(e) => {
-            eprintln!("\nTUI error: {e}");
+            eprintln!("TUI error: {e}");
         },
     }
 }
