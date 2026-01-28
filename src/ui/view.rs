@@ -23,9 +23,9 @@ fn render_loading(frame: &mut Frame, state: &AppState) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(40),
-            Constraint::Length(3),
-            Constraint::Percentage(40),
+            Constraint::Percentage(35),
+            Constraint::Length(7),
+            Constraint::Percentage(35),
         ])
         .split(area);
 
@@ -33,17 +33,30 @@ fn render_loading(frame: &mut Frame, state: &AppState) {
     let text = vec![
         Line::from(""),
         Line::from(vec![
-            Span::styled(spinner, Style::default().fg(Color::Cyan)),
+            Span::styled(
+                spinner,
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw("  "),
-            Span::raw(&state.loading_message),
+            Span::styled(&state.loading_message, Style::default().fg(Color::White)),
         ]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Please wait...",
+            Style::default().fg(Color::DarkGray),
+        )),
         Line::from(""),
     ];
 
     let paragraph = Paragraph::new(text).alignment(Alignment::Center).block(
-        Block::default()
-            .borders(Borders::ALL)
-            .title("Scanning for Updates"),
+        Block::default().borders(Borders::ALL).title(Span::styled(
+            "Scanning for Updates",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )),
     );
 
     frame.render_widget(paragraph, chunks[1]);

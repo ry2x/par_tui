@@ -68,11 +68,20 @@ fn start_scan_thread(tx: Sender<ScanMessage>, has_paru: bool) {
         match command::run_checkupdates() {
             Ok(output) => {
                 let packages = pacman::parse_checkupdates_output(&output);
+                let count = packages.len();
                 let _ = tx.send(ScanMessage::OfficialComplete(Ok(packages.clone())));
+                let _ = tx.send(ScanMessage::Progress(format!(
+                    "Found {} official update{}",
+                    count,
+                    if count == 1 { "" } else { "s" }
+                )));
                 all_packages.extend(packages);
             },
             Err(e) => {
                 let _ = tx.send(ScanMessage::OfficialComplete(Err(format!("{e:?}"))));
+                let _ = tx.send(ScanMessage::Progress(
+                    "Warning: Could not scan official repos".to_string(),
+                ));
             },
         }
 
@@ -85,14 +94,31 @@ fn start_scan_thread(tx: Sender<ScanMessage>, has_paru: bool) {
             match command::run_paru_query_aur() {
                 Ok(output) => {
                     let packages = paru::parse_paru_output(&output);
+                    let count = packages.len();
                     let _ = tx.send(ScanMessage::AurComplete(Ok(packages.clone())));
+                    let _ = tx.send(ScanMessage::Progress(format!(
+                        "Found {} AUR update{}",
+                        count,
+                        if count == 1 { "" } else { "s" }
+                    )));
                     all_packages.extend(packages);
                 },
                 Err(e) => {
                     let _ = tx.send(ScanMessage::AurComplete(Err(format!("{e:?}"))));
+                    let _ = tx.send(ScanMessage::Progress(
+                        "Warning: Could not scan AUR packages".to_string(),
+                    ));
                 },
             }
         }
+
+        // Final message
+        let total = all_packages.len();
+        let _ = tx.send(ScanMessage::Progress(format!(
+            "Scan complete. Total: {} update{}",
+            total,
+            if total == 1 { "" } else { "s" }
+        )));
 
         let _ = tx.send(ScanMessage::Complete(all_packages));
     });

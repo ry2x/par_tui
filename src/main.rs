@@ -6,9 +6,9 @@ mod ui;
 
 use core::planner::{self, UpdateMode};
 use io::{command, file, terminal};
-use parser::{pacman, paru, toml as toml_parser};
+use parser::toml as toml_parser;
 use std::path::PathBuf;
-use ui::app::{AppState, UIEvent};
+use ui::app::UIEvent;
 
 fn main() {
     // Load config
