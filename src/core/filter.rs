@@ -5,6 +5,7 @@ use crate::models::package::Package;
 ///
 /// Returns a new vector with excluded packages filtered out.
 #[must_use]
+#[allow(dead_code)]
 pub fn apply_permanent_excludes(packages: Vec<Package>, config: &Config) -> Vec<Package> {
     let excludes = &config.exclude.permanent;
     packages
@@ -17,6 +18,7 @@ pub fn apply_permanent_excludes(packages: Vec<Package>, config: &Config) -> Vec<
 ///
 /// Returns a new vector with excluded packages filtered out.
 #[must_use]
+#[allow(dead_code)]
 pub fn apply_temporary_excludes(packages: Vec<Package>, temp_excludes: &[String]) -> Vec<Package> {
     packages
         .into_iter()

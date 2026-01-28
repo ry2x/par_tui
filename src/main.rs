@@ -21,10 +21,7 @@ fn main() {
     let config_path = PathBuf::from(config_home).join("partui/config.toml");
 
     let config = if let Ok(content) = file::read_config(&config_path) {
-        match toml_parser::parse_config(&content) {
-            Ok(cfg) => cfg,
-            Err(_) => models::config::Config::default(),
-        }
+        toml_parser::parse_config(&content).unwrap_or_default()
     } else {
         models::config::Config::default()
     };

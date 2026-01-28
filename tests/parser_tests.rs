@@ -1,4 +1,4 @@
-use par_tui::models::package::{Package, PackageRepository};
+use par_tui::models::package::PackageRepository;
 use par_tui::parser::pacman;
 
 #[test]
@@ -15,10 +15,10 @@ fn test_parse_checkupdates_single_package() {
 
 #[test]
 fn test_parse_checkupdates_multiple_packages() {
-    let output = r#"linux 6.1.10-1 -> 6.1.12-1
+    let output = r"linux 6.1.10-1 -> 6.1.12-1
 mesa 23.0.1-1 -> 23.0.2-1
 systemd 253.1-1 -> 253.2-1
-"#;
+";
     let packages = pacman::parse_checkupdates_output(output);
 
     assert_eq!(packages.len(), 3);
@@ -37,10 +37,10 @@ fn test_parse_checkupdates_empty() {
 
 #[test]
 fn test_parse_checkupdates_malformed_line() {
-    let output = r#"linux 6.1.10-1 -> 6.1.12-1
+    let output = r"linux 6.1.10-1 -> 6.1.12-1
 invalid line
 mesa 23.0.1-1 -> 23.0.2-1
-"#;
+";
     let packages = pacman::parse_checkupdates_output(output);
 
     // Should skip malformed line
