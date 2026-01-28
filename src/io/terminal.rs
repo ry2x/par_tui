@@ -179,6 +179,9 @@ fn start_scan_thread(
     })
 }
 
+// Clippy suggests taking `&Receiver` here, but the event loop needs to own
+// the `Receiver<ScanMessage>` and consume it (calling `try_recv` in a loop),
+// so we intentionally pass it by value and suppress `needless_pass_by_value`.
 #[allow(clippy::needless_pass_by_value)]
 fn run_app_with_loading(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,

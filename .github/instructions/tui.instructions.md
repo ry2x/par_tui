@@ -79,7 +79,6 @@ The main screen uses a **three-pane layout** optimized for fast scanning and key
 |   [ ] [AUR]      yay                12.0.1 -> 12.0.2        |
 |   ...                                                       |
 +-------------------------------------------------------------+
-| Mode: Entire System (paru)                                  |
 | Stats: Official (10) | AUR (4) | To Ignore: 1               |
 +-------------------------------------------------------------+
 | [Enter] Entire  [o] Official  [Space] Toggle  [p] Perm  [q] |

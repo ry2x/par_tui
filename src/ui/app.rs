@@ -48,17 +48,7 @@ impl AppState {
     /// Creates a new `AppState` with the given packages and permanent exclusions.
     #[must_use]
     pub fn new(packages: Vec<Package>, permanent_excludes: &[String]) -> Self {
-        let items = packages
-            .into_iter()
-            .map(|pkg| {
-                let is_perm = permanent_excludes.contains(&pkg.name);
-                PackageItem {
-                    package: pkg,
-                    is_temporarily_ignored: false,
-                    is_permanently_ignored: is_perm,
-                }
-            })
-            .collect();
+        let items = Self::create_package_items(packages, permanent_excludes);
 
         Self {
             packages: items,
@@ -70,16 +60,25 @@ impl AppState {
         }
     }
 
-    pub fn set_loading_message(&mut self, message: String) {
-        self.loading_message = message;
+    pub fn set_loading_message<S: Into<String>>(&mut self, message: S) {
+        self.loading_message = message.into();
     }
 
-    pub fn add_scan_warning(&mut self, warning: String) {
-        self.scan_warnings.push(warning);
+    pub fn add_scan_warning<S: Into<String>>(&mut self, warning: S) {
+        self.scan_warnings.push(warning.into());
     }
 
     pub fn set_packages(&mut self, packages: Vec<Package>, permanent_excludes: &[String]) {
-        let items = packages
+        self.packages = Self::create_package_items(packages, permanent_excludes);
+        self.loading_state = LoadingState::Ready;
+    }
+
+    /// Helper to create PackageItem list from packages and permanent exclusions
+    fn create_package_items(
+        packages: Vec<Package>,
+        permanent_excludes: &[String],
+    ) -> Vec<PackageItem> {
+        packages
             .into_iter()
             .map(|pkg| {
                 let is_perm = permanent_excludes.contains(&pkg.name);
@@ -89,17 +88,15 @@ impl AppState {
                     is_permanently_ignored: is_perm,
                 }
             })
-            .collect();
-        self.packages = items;
-        self.loading_state = LoadingState::Ready;
+            .collect()
     }
 
     pub fn set_no_updates(&mut self) {
         self.loading_state = LoadingState::NoUpdates;
     }
 
-    pub fn set_error(&mut self, error: String) {
-        self.loading_state = LoadingState::Error(error);
+    pub fn set_error<S: Into<String>>(&mut self, error: S) {
+        self.loading_state = LoadingState::Error(error.into());
     }
 
     pub fn move_cursor_up(&mut self) {
