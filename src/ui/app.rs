@@ -21,6 +21,7 @@ pub struct AppState {
     pub show_help: bool,
     pub loading_state: LoadingState,
     pub loading_message: String,
+    pub scan_warnings: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -40,6 +41,7 @@ impl AppState {
             show_help: false,
             loading_state: LoadingState::Scanning,
             loading_message: "Initializing...".to_string(),
+            scan_warnings: Vec::new(),
         }
     }
 
@@ -64,11 +66,16 @@ impl AppState {
             show_help: false,
             loading_state: LoadingState::Ready,
             loading_message: String::new(),
+            scan_warnings: Vec::new(),
         }
     }
 
     pub fn set_loading_message(&mut self, message: String) {
         self.loading_message = message;
+    }
+
+    pub fn add_scan_warning(&mut self, warning: String) {
+        self.scan_warnings.push(warning);
     }
 
     pub fn set_packages(&mut self, packages: Vec<Package>, permanent_excludes: &[String]) {

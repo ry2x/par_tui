@@ -139,12 +139,14 @@ fn get_spinner() -> &'static str {
 }
 
 fn render_main(frame: &mut Frame, state: &AppState) {
+    let status_height = if state.scan_warnings.is_empty() { 2 } else { 3 };
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(1),
             Constraint::Min(0),
-            Constraint::Length(2),
+            Constraint::Length(status_height),
             Constraint::Length(1),
         ])
         .split(frame.area());
@@ -237,12 +239,23 @@ fn render_package_list(frame: &mut Frame, area: Rect, state: &AppState) {
 fn render_status(frame: &mut Frame, area: Rect, state: &AppState) {
     let (official, aur, ignored) = state.stats();
 
-    let status_lines = vec![
+    let mut status_lines = vec![
         Line::from("Mode: Entire System (paru)".to_string()),
         Line::from(format!(
             "Stats: Official ({official}) | AUR ({aur}) | To Ignore: {ignored}"
         )),
     ];
+
+    // Add warnings if any
+    if !state.scan_warnings.is_empty() {
+        status_lines.push(Line::from(vec![
+            Span::styled("⚠ ", Style::default().fg(Color::Yellow)),
+            Span::styled(
+                state.scan_warnings.join(", "),
+                Style::default().fg(Color::Yellow),
+            ),
+        ]));
+    }
 
     let status = Paragraph::new(status_lines).block(Block::default().borders(Borders::ALL));
     frame.render_widget(status, area);

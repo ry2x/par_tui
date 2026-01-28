@@ -24,6 +24,7 @@ pub enum ScanMessage {
     Progress(String),
     OfficialComplete(Result<Vec<Package>, String>),
     AurComplete(Result<Vec<Package>, String>),
+    ScanWarning(String),
     Complete(Vec<Package>),
 }
 
@@ -86,6 +87,9 @@ fn start_scan_thread(tx: Sender<ScanMessage>, has_paru: bool) {
             },
             Err(e) => {
                 let _ = tx.send(ScanMessage::OfficialComplete(Err(format!("{e:?}"))));
+                let _ = tx.send(ScanMessage::ScanWarning(
+                    "Official repositories scan failed".to_string(),
+                ));
                 let _ = tx.send(ScanMessage::Progress(
                     "Warning: Could not scan official repos".to_string(),
                 ));
@@ -112,6 +116,7 @@ fn start_scan_thread(tx: Sender<ScanMessage>, has_paru: bool) {
                 },
                 Err(e) => {
                     let _ = tx.send(ScanMessage::AurComplete(Err(format!("{e:?}"))));
+                    let _ = tx.send(ScanMessage::ScanWarning("AUR scan failed".to_string()));
                     let _ = tx.send(ScanMessage::Progress(
                         "Warning: Could not scan AUR packages".to_string(),
                     ));
@@ -148,6 +153,9 @@ fn run_app_with_loading(
                 },
                 ScanMessage::OfficialComplete(_) | ScanMessage::AurComplete(_) => {
                     // Progress updates, continue
+                },
+                ScanMessage::ScanWarning(warning) => {
+                    state.add_scan_warning(warning);
                 },
                 ScanMessage::Complete(packages) => {
                     if packages.is_empty() {
