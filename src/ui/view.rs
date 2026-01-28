@@ -144,7 +144,7 @@ fn render_main(frame: &mut Frame, state: &AppState) {
         .constraints([
             Constraint::Length(1),
             Constraint::Min(0),
-            Constraint::Length(3),
+            Constraint::Length(2),
             Constraint::Length(1),
         ])
         .split(frame.area());
@@ -245,12 +245,7 @@ fn render_status(frame: &mut Frame, area: Rect, state: &AppState) {
         stats_text
     };
 
-    let status_lines = vec![
-        Line::from("Mode: Entire System (paru)".to_string()),
-        Line::from(status_line),
-    ];
-
-    let status = Paragraph::new(status_lines).block(Block::default().borders(Borders::ALL));
+    let status = Paragraph::new(status_line).block(Block::default().borders(Borders::ALL));
     frame.render_widget(status, area);
 }
 
