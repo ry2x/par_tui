@@ -26,8 +26,6 @@ use crate::{
 
 pub enum ScanMessage {
     Progress(String),
-    OfficialComplete(Result<Vec<Package>, String>),
-    AurComplete(Result<Vec<Package>, String>),
     ScanWarning(String),
     Complete(Vec<Package>),
 }
@@ -74,6 +72,15 @@ fn start_scan_thread(
     cancel_flag: Arc<AtomicBool>,
 ) -> JoinHandle<()> {
     thread::spawn(move || {
+        // Helper macro to send message and return early if channel is closed
+        macro_rules! send_or_return {
+            ($msg:expr) => {
+                if tx.send($msg).is_err() {
+                    return;
+                }
+            };
+        }
+
         let mut all_packages = Vec::new();
         let mut official_failed = false;
         let mut aur_failed = false;
@@ -83,23 +90,21 @@ fn start_scan_thread(
             return;
         }
 
-        let _ = tx.send(ScanMessage::Progress(
-            "Scanning official repositories...".to_string(),
+        send_or_return!(ScanMessage::Progress(
+            "Scanning official repositories...".to_string()
         ));
 
         let tx_clone = tx.clone();
         match command::run_checkupdates_with_callback(|attempt, max| {
             let _ = tx_clone.send(ScanMessage::Progress(format!(
                 "Retrying checkupdates (attempt {}/{})",
-                attempt + 1,
-                max
+                attempt, max
             )));
         }) {
             Ok(output) => {
                 let packages = pacman::parse_checkupdates_output(&output);
                 let count = packages.len();
-                let _ = tx.send(ScanMessage::OfficialComplete(Ok(packages.clone())));
-                let _ = tx.send(ScanMessage::Progress(format!(
+                send_or_return!(ScanMessage::Progress(format!(
                     "Found {} official update{}",
                     count,
                     if count == 1 { "" } else { "s" }
@@ -108,25 +113,23 @@ fn start_scan_thread(
             },
             Err(e) => {
                 official_failed = true;
-                let _ = tx.send(ScanMessage::OfficialComplete(Err(format!("{e:?}"))));
-                let _ = tx.send(ScanMessage::Progress(
-                    "Warning: Could not scan official repos".to_string(),
-                ));
+                send_or_return!(ScanMessage::Progress(format!(
+                    "Warning: Could not scan official repos: {e:?}"
+                )));
             },
         }
 
         // Scan AUR packages
         if has_paru && !cancel_flag.load(Ordering::Relaxed) {
-            let _ = tx.send(ScanMessage::Progress(
-                "Scanning AUR packages...".to_string(),
+            send_or_return!(ScanMessage::Progress(
+                "Scanning AUR packages...".to_string()
             ));
 
             match command::run_paru_query_aur() {
                 Ok(output) => {
                     let packages = paru::parse_paru_output(&output);
                     let count = packages.len();
-                    let _ = tx.send(ScanMessage::AurComplete(Ok(packages.clone())));
-                    let _ = tx.send(ScanMessage::Progress(format!(
+                    send_or_return!(ScanMessage::Progress(format!(
                         "Found {} AUR update{}",
                         count,
                         if count == 1 { "" } else { "s" }
@@ -135,10 +138,9 @@ fn start_scan_thread(
                 },
                 Err(e) => {
                     aur_failed = true;
-                    let _ = tx.send(ScanMessage::AurComplete(Err(format!("{e:?}"))));
-                    let _ = tx.send(ScanMessage::Progress(
-                        "Warning: Could not scan AUR packages".to_string(),
-                    ));
+                    send_or_return!(ScanMessage::Progress(format!(
+                        "Warning: Could not scan AUR packages: {e:?}"
+                    )));
                 },
             }
         }
@@ -150,7 +152,7 @@ fn start_scan_thread(
 
         // Final status message
         let total = all_packages.len();
-        let _ = tx.send(ScanMessage::Progress(format!(
+        send_or_return!(ScanMessage::Progress(format!(
             "Scan complete. Total: {} update{}",
             total,
             if total == 1 { "" } else { "s" }
@@ -165,13 +167,13 @@ fn start_scan_thread(
             if aur_failed {
                 failed_sources.push("AUR");
             }
-            let _ = tx.send(ScanMessage::ScanWarning(format!(
+            send_or_return!(ScanMessage::ScanWarning(format!(
                 "{} scan failed",
                 failed_sources.join(" & ")
             )));
         }
 
-        let _ = tx.send(ScanMessage::Complete(all_packages));
+        send_or_return!(ScanMessage::Complete(all_packages));
     })
 }
 
@@ -190,9 +192,6 @@ fn run_app_with_loading(
             match msg {
                 ScanMessage::Progress(message) => {
                     state.set_loading_message(message);
-                },
-                ScanMessage::OfficialComplete(_) | ScanMessage::AurComplete(_) => {
-                    // Progress updates, continue
                 },
                 ScanMessage::ScanWarning(warning) => {
                     state.add_scan_warning(warning);
