@@ -24,7 +24,7 @@ fn render_loading(frame: &mut Frame, state: &AppState) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Percentage(35),
-            Constraint::Length(7),
+            Constraint::Length(9),
             Constraint::Percentage(35),
         ])
         .split(area);
@@ -45,6 +45,11 @@ fn render_loading(frame: &mut Frame, state: &AppState) {
         Line::from(""),
         Line::from(Span::styled(
             "Please wait...",
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Press [q] to quit",
             Style::default().fg(Color::DarkGray),
         )),
         Line::from(""),
