@@ -1,4 +1,6 @@
 use std::process::Command;
+use std::thread;
+use std::time::Duration;
 
 #[derive(Debug)]
 pub enum CommandError {
@@ -6,24 +8,43 @@ pub enum CommandError {
     NotFound(String),
 }
 
-/// Runs `checkupdates` to scan for official package updates.
+/// Runs `checkupdates` to scan for official package updates with retry logic.
+///
+/// Retries up to 3 times with 2 second delays on failure.
 ///
 /// # Errors
 ///
 /// Returns `CommandError::ExecutionFailed` if the command fails to execute
-/// or returns a non-zero exit status (except exit code 2, which means no updates).
+/// or returns a non-zero exit status after all retries (except exit code 2, which means no updates).
 pub fn run_checkupdates() -> Result<String, CommandError> {
-    let output = Command::new("checkupdates")
-        .output()
-        .map_err(|e| CommandError::ExecutionFailed(e.to_string()))?;
+    const MAX_RETRIES: u32 = 3;
+    const RETRY_DELAY_SECS: u64 = 2;
 
-    if !output.status.success() && output.status.code() != Some(2) {
-        return Err(CommandError::ExecutionFailed(
-            String::from_utf8_lossy(&output.stderr).to_string(),
-        ));
+    let mut last_error = String::new();
+
+    for attempt in 1..=MAX_RETRIES {
+        let output = Command::new("checkupdates")
+            .output()
+            .map_err(|e| CommandError::ExecutionFailed(e.to_string()))?;
+
+        // Exit code 2 means no updates available (not an error)
+        if output.status.success() || output.status.code() == Some(2) {
+            return Ok(String::from_utf8_lossy(&output.stdout).to_string());
+        }
+
+        last_error = String::from_utf8_lossy(&output.stderr).to_string();
+
+        if attempt < MAX_RETRIES {
+            eprintln!(
+                "checkupdates failed (attempt {attempt}/{MAX_RETRIES}), retrying in {RETRY_DELAY_SECS}s..."
+            );
+            thread::sleep(Duration::from_secs(RETRY_DELAY_SECS));
+        }
     }
 
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    Err(CommandError::ExecutionFailed(format!(
+        "Failed after {MAX_RETRIES} attempts: {last_error}"
+    )))
 }
 
 /// Runs `paru -Qua` to query AUR package updates.
