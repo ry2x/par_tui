@@ -6,7 +6,11 @@ use crossterm::{
 use ratatui::{Terminal, backend::CrosstermBackend};
 use std::io;
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::thread;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
+use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use crate::models::config::Config;
@@ -46,9 +50,16 @@ pub fn run_tui_with_scan(
     let mut state = AppState::new_loading();
 
     let (tx, rx) = mpsc::channel();
-    start_scan_thread(tx, has_paru);
+    let cancel_flag = Arc::new(AtomicBool::new(false));
+    let scan_handle = start_scan_thread(tx, has_paru, Arc::clone(&cancel_flag));
 
     let result = run_app_with_loading(&mut terminal, &mut state, rx, config);
+
+    // Signal thread to stop if still running
+    cancel_flag.store(true, Ordering::Relaxed);
+
+    // Wait for thread to complete (with timeout to avoid hanging)
+    let _ = scan_handle.join();
 
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
@@ -57,13 +68,21 @@ pub fn run_tui_with_scan(
     result.map(|event| (event, state))
 }
 
-fn start_scan_thread(tx: Sender<ScanMessage>, has_paru: bool) {
+fn start_scan_thread(
+    tx: Sender<ScanMessage>,
+    has_paru: bool,
+    cancel_flag: Arc<AtomicBool>,
+) -> JoinHandle<()> {
     thread::spawn(move || {
         let mut all_packages = Vec::new();
         let mut official_failed = false;
         let mut aur_failed = false;
 
         // Scan official packages
+        if cancel_flag.load(Ordering::Relaxed) {
+            return;
+        }
+
         let _ = tx.send(ScanMessage::Progress(
             "Scanning official repositories...".to_string(),
         ));
@@ -97,7 +116,7 @@ fn start_scan_thread(tx: Sender<ScanMessage>, has_paru: bool) {
         }
 
         // Scan AUR packages
-        if has_paru {
+        if has_paru && !cancel_flag.load(Ordering::Relaxed) {
             let _ = tx.send(ScanMessage::Progress(
                 "Scanning AUR packages...".to_string(),
             ));
@@ -124,6 +143,11 @@ fn start_scan_thread(tx: Sender<ScanMessage>, has_paru: bool) {
             }
         }
 
+        // Check if cancelled before sending final messages
+        if cancel_flag.load(Ordering::Relaxed) {
+            return;
+        }
+
         // Final status message
         let total = all_packages.len();
         let _ = tx.send(ScanMessage::Progress(format!(
@@ -148,7 +172,7 @@ fn start_scan_thread(tx: Sender<ScanMessage>, has_paru: bool) {
         }
 
         let _ = tx.send(ScanMessage::Complete(all_packages));
-    });
+    })
 }
 
 #[allow(clippy::needless_pass_by_value)]
