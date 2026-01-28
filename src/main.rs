@@ -86,18 +86,39 @@ fn main() {
     let state = AppState::new(all_packages.clone(), &config.exclude.permanent);
 
     match terminal::run_tui(state) {
-        Ok((Some(event), final_state)) => match event {
-            UIEvent::UpdateEntireSystem => {
-                let ignored = final_state.get_ignored_packages();
-                execute_update(UpdateMode::EntireSystem, all_packages, ignored, &config);
-            },
-            UIEvent::UpdateOfficialOnly => {
-                let ignored = final_state.get_ignored_packages();
-                execute_update(UpdateMode::OfficialOnly, all_packages, ignored, &config);
-            },
-            UIEvent::Quit => {
-                println!("\nExiting without updates.");
-            },
+        Ok((Some(event), final_state)) => {
+            // Save permanent excludes if changed
+            let new_permanent = final_state.get_permanent_excludes();
+            if new_permanent != config.exclude.permanent {
+                let mut updated_config = config.clone();
+                updated_config.exclude.permanent = new_permanent;
+                match toml_parser::serialize_config(&updated_config) {
+                    Ok(content) => {
+                        if let Err(e) = file::write_config(&config_path, &content) {
+                            eprintln!("Warning: Could not save config: {e:?}");
+                        } else {
+                            println!("Permanent excludes saved to config.");
+                        }
+                    },
+                    Err(e) => {
+                        eprintln!("Warning: Could not serialize config: {e:?}");
+                    },
+                }
+            }
+
+            match event {
+                UIEvent::UpdateEntireSystem => {
+                    let ignored = final_state.get_ignored_packages();
+                    execute_update(UpdateMode::EntireSystem, all_packages, ignored, &config);
+                },
+                UIEvent::UpdateOfficialOnly => {
+                    let ignored = final_state.get_ignored_packages();
+                    execute_update(UpdateMode::OfficialOnly, all_packages, ignored, &config);
+                },
+                UIEvent::Quit => {
+                    println!("\nExiting without updates.");
+                },
+            }
         },
         Ok((None, _)) => {
             println!("\nNo action taken.");

@@ -45,6 +45,7 @@ fn run_app(
                 (KeyCode::Char('?'), _) => state.toggle_help(),
                 (KeyCode::Char('j') | KeyCode::Down, _) => state.move_cursor_down(),
                 (KeyCode::Char('k') | KeyCode::Up, _) => state.move_cursor_up(),
+                (KeyCode::Char('p'), _) => state.toggle_permanent_ignore(),
                 (KeyCode::Char(' '), _) => state.toggle_current_package(),
                 (KeyCode::Enter, KeyModifiers::SHIFT) => {
                     return Ok(Some(UIEvent::UpdateOfficialOnly));

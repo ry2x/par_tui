@@ -121,7 +121,7 @@ fn render_status(frame: &mut Frame, area: Rect, state: &AppState) {
 
 fn render_keybinds(frame: &mut Frame, area: Rect) {
     let keybinds =
-        Paragraph::new("[Enter] Entire  [S-Enter] Official Only  [Space] Toggle  [q] Quit")
+        Paragraph::new("[Enter] Entire  [S-Enter] Official  [Space] Toggle  [p] Perm  [q] Quit")
             .alignment(Alignment::Center)
             .style(Style::default().fg(Color::DarkGray));
     frame.render_widget(keybinds, area);
@@ -142,7 +142,11 @@ fn render_help_modal(frame: &mut Frame) {
         ]),
         Line::from(vec![
             Span::styled("[Space]   ", Style::default().add_modifier(Modifier::BOLD)),
-            Span::raw(": Toggle Package Ignore"),
+            Span::raw(": Toggle Temporary Ignore"),
+        ]),
+        Line::from(vec![
+            Span::styled("[p]       ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw(": Toggle Permanent Ignore"),
         ]),
         Line::from(vec![
             Span::styled("[j/k]     ", Style::default().add_modifier(Modifier::BOLD)),

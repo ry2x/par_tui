@@ -63,6 +63,15 @@ impl AppState {
         }
     }
 
+    pub fn toggle_permanent_ignore(&mut self) {
+        if let Some(item) = self.packages.get_mut(self.cursor_position) {
+            item.is_permanently_ignored = !item.is_permanently_ignored;
+            if item.is_permanently_ignored {
+                item.is_temporarily_ignored = false;
+            }
+        }
+    }
+
     pub fn toggle_help(&mut self) {
         self.show_help = !self.show_help;
     }
@@ -73,6 +82,16 @@ impl AppState {
         self.packages
             .iter()
             .filter(|item| item.is_temporarily_ignored || item.is_permanently_ignored)
+            .map(|item| item.package.name.clone())
+            .collect()
+    }
+
+    /// Returns a list of permanently ignored package names.
+    #[must_use]
+    pub fn get_permanent_excludes(&self) -> Vec<String> {
+        self.packages
+            .iter()
+            .filter(|item| item.is_permanently_ignored)
             .map(|item| item.package.name.clone())
             .collect()
     }

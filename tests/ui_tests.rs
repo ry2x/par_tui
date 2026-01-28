@@ -144,3 +144,62 @@ fn test_toggle_help() {
     state.toggle_help();
     assert!(!state.show_help);
 }
+
+#[test]
+fn test_toggle_permanent_ignore() {
+    let packages = vec![
+        make_test_package("pkg1", PackageRepository::Official),
+        make_test_package("pkg2", PackageRepository::Official),
+    ];
+    let permanent = vec!["pkg2".to_string()];
+
+    let mut state = AppState::new(packages, &permanent);
+
+    // pkg1 starts as not permanently ignored
+    assert!(!state.packages[0].is_permanently_ignored);
+
+    // Toggle permanent ignore on pkg1
+    state.toggle_permanent_ignore();
+    assert!(state.packages[0].is_permanently_ignored);
+
+    // Toggle again to remove permanent ignore
+    state.toggle_permanent_ignore();
+    assert!(!state.packages[0].is_permanently_ignored);
+}
+
+#[test]
+fn test_toggle_permanent_clears_temporary() {
+    let packages = vec![make_test_package("pkg1", PackageRepository::Official)];
+    let mut state = AppState::new(packages, &[]);
+
+    // Set temporary ignore first
+    state.toggle_current_package();
+    assert!(state.packages[0].is_temporarily_ignored);
+    assert!(!state.packages[0].is_permanently_ignored);
+
+    // Toggle permanent ignore should clear temporary
+    state.toggle_permanent_ignore();
+    assert!(state.packages[0].is_permanently_ignored);
+    assert!(!state.packages[0].is_temporarily_ignored);
+}
+
+#[test]
+fn test_get_permanent_excludes() {
+    let packages = vec![
+        make_test_package("pkg1", PackageRepository::Official),
+        make_test_package("pkg2", PackageRepository::Official),
+        make_test_package("pkg3", PackageRepository::Official),
+    ];
+    let permanent = vec!["pkg2".to_string()];
+
+    let mut state = AppState::new(packages, &permanent);
+
+    // Toggle pkg1 to permanent ignore
+    state.toggle_permanent_ignore();
+
+    let permanent_list = state.get_permanent_excludes();
+
+    assert_eq!(permanent_list.len(), 2);
+    assert!(permanent_list.contains(&"pkg1".to_string()));
+    assert!(permanent_list.contains(&"pkg2".to_string()));
+}
