@@ -151,6 +151,7 @@ fn start_scan_thread(tx: Sender<ScanMessage>, has_paru: bool) {
     });
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn run_app_with_loading(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     state: &mut AppState,
@@ -183,30 +184,30 @@ fn run_app_with_loading(
         }
 
         // Poll for keyboard events with timeout
-        if event::poll(Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
-                match (&state.loading_state, key.code) {
-                    // Allow quit in any state
-                    (_, KeyCode::Char('q')) => return Ok(Some(UIEvent::Quit)),
+        if event::poll(Duration::from_millis(100))?
+            && let Event::Key(key) = event::read()?
+        {
+            match (&state.loading_state, key.code) {
+                // Allow quit in any state
+                (_, KeyCode::Char('q')) => return Ok(Some(UIEvent::Quit)),
 
-                    // Only allow other keys when ready
-                    (LoadingState::Ready, KeyCode::Char('?')) => state.toggle_help(),
-                    (LoadingState::Ready, KeyCode::Char('j') | KeyCode::Down) => {
-                        state.move_cursor_down()
-                    },
-                    (LoadingState::Ready, KeyCode::Char('k') | KeyCode::Up) => {
-                        state.move_cursor_up()
-                    },
-                    (LoadingState::Ready, KeyCode::Char('p')) => state.toggle_permanent_ignore(),
-                    (LoadingState::Ready, KeyCode::Char(' ')) => state.toggle_current_package(),
-                    (LoadingState::Ready, KeyCode::Char('o')) => {
-                        return Ok(Some(UIEvent::UpdateOfficialOnly));
-                    },
-                    (LoadingState::Ready, KeyCode::Enter) => {
-                        return Ok(Some(UIEvent::UpdateEntireSystem));
-                    },
-                    _ => {},
-                }
+                // Only allow other keys when ready
+                (LoadingState::Ready, KeyCode::Char('?')) => state.toggle_help(),
+                (LoadingState::Ready, KeyCode::Char('j') | KeyCode::Down) => {
+                    state.move_cursor_down();
+                },
+                (LoadingState::Ready, KeyCode::Char('k') | KeyCode::Up) => {
+                    state.move_cursor_up();
+                },
+                (LoadingState::Ready, KeyCode::Char('p')) => state.toggle_permanent_ignore(),
+                (LoadingState::Ready, KeyCode::Char(' ')) => state.toggle_current_package(),
+                (LoadingState::Ready, KeyCode::Char('o')) => {
+                    return Ok(Some(UIEvent::UpdateOfficialOnly));
+                },
+                (LoadingState::Ready, KeyCode::Enter) => {
+                    return Ok(Some(UIEvent::UpdateEntireSystem));
+                },
+                _ => {},
             }
         }
     }

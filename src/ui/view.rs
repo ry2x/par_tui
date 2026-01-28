@@ -132,7 +132,7 @@ fn get_spinner() -> &'static str {
     const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
+        .unwrap_or_default()
         .as_millis();
     let frame = (now / 80) % SPINNER_FRAMES.len() as u128;
     SPINNER_FRAMES[frame as usize]
@@ -239,10 +239,10 @@ fn render_status(frame: &mut Frame, area: Rect, state: &AppState) {
 
     let stats_text = format!("Stats: Official ({official}) | AUR ({aur}) | To Ignore: {ignored}");
 
-    let status_line = if !state.scan_warnings.is_empty() {
-        format!("{} | ⚠ {}", stats_text, state.scan_warnings.join(", "))
-    } else {
+    let status_line = if state.scan_warnings.is_empty() {
         stats_text
+    } else {
+        format!("{} | ⚠ {}", stats_text, state.scan_warnings.join(", "))
     };
 
     let status = Paragraph::new(status_line).block(Block::default().borders(Borders::ALL));
