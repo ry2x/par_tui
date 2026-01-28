@@ -1,9 +1,9 @@
 use ratatui::{
+    Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
-    Frame,
 };
 
 use super::app::AppState;
@@ -35,8 +35,11 @@ fn render_header(frame: &mut Frame, area: Rect, state: &AppState) {
         "par_tui - [Updates Found: {}]                     [Help: ?]",
         state.packages.len()
     );
-    let header = Paragraph::new(title)
-        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
+    let header = Paragraph::new(title).style(
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    );
     frame.render_widget(header, area);
 }
 
@@ -87,7 +90,9 @@ fn render_package_list(frame: &mut Frame, area: Rect, state: &AppState) {
             ]);
 
             let style = if idx == state.cursor_position {
-                Style::default().fg(Color::White).add_modifier(Modifier::REVERSED)
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::REVERSED)
             } else {
                 Style::default()
             };
@@ -115,9 +120,10 @@ fn render_status(frame: &mut Frame, area: Rect, state: &AppState) {
 }
 
 fn render_keybinds(frame: &mut Frame, area: Rect) {
-    let keybinds = Paragraph::new("[Enter] Entire  [S-Enter] Official Only  [Space] Toggle  [q] Quit")
-        .alignment(Alignment::Center)
-        .style(Style::default().fg(Color::DarkGray));
+    let keybinds =
+        Paragraph::new("[Enter] Entire  [S-Enter] Official Only  [Space] Toggle  [q] Quit")
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(Color::DarkGray));
     frame.render_widget(keybinds, area);
 }
 
@@ -149,6 +155,16 @@ fn render_help_modal(frame: &mut Frame) {
         Line::from(vec![
             Span::styled("[q]       ", Style::default().add_modifier(Modifier::BOLD)),
             Span::raw(": Quit Application"),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::raw(" GitHub: "),
+            Span::styled(
+                "https://github.com/ry2x/par_tui",
+                Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::UNDERLINED),
+            ),
         ]),
         Line::from(""),
         Line::from(Span::styled(
