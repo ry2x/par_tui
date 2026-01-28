@@ -237,7 +237,29 @@ fn render_package_list(frame: &mut Frame, area: Rect, state: &AppState) {
         })
         .collect();
 
-    let list = List::new(items).block(Block::default().borders(Borders::ALL));
+    // Calculate scroll offset to keep cursor visible
+    let visible_height = area.height.saturating_sub(2) as usize; // Subtract borders
+    let total_items = state.packages.len();
+
+    // Calculate offset to keep cursor visible
+    let offset = if total_items <= visible_height {
+        0
+    } else if state.cursor_position < visible_height / 2 {
+        0
+    } else if state.cursor_position >= total_items - visible_height / 2 {
+        total_items.saturating_sub(visible_height)
+    } else {
+        state.cursor_position.saturating_sub(visible_height / 2)
+    };
+
+    // Only render visible items
+    let visible_items: Vec<ListItem> = items
+        .into_iter()
+        .skip(offset)
+        .take(visible_height)
+        .collect();
+
+    let list = List::new(visible_items).block(Block::default().borders(Borders::ALL));
     frame.render_widget(list, area);
 }
 
