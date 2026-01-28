@@ -22,16 +22,18 @@ fn main() {
     });
     let config_path = PathBuf::from(config_home).join("partui/config.toml");
 
-    let config = if let Ok(content) = file::read_config(&config_path) { match toml_parser::parse_config(&content) {
-        Ok(cfg) => {
-            println!("Config loaded from: {}", config_path.display());
-            cfg
+    let config = if let Ok(content) = file::read_config(&config_path) {
+        match toml_parser::parse_config(&content) {
+            Ok(cfg) => {
+                println!("Config loaded from: {}", config_path.display());
+                cfg
+            },
+            Err(e) => {
+                println!("Config parse error: {e:?}, using defaults");
+                models::config::Config::default()
+            },
         }
-        Err(e) => {
-            println!("Config parse error: {e:?}, using defaults");
-            models::config::Config::default()
-        }
-    } } else {
+    } else {
         println!("No config found, using defaults");
         models::config::Config::default()
     };
@@ -55,10 +57,10 @@ fn main() {
             let packages = pacman::parse_checkupdates_output(&output);
             println!("Found {} official updates", packages.len());
             all_packages.extend(packages);
-        }
+        },
         Err(e) => {
             eprintln!("Warning: Could not scan official updates: {e:?}");
-        }
+        },
     }
 
     if has_paru {
@@ -67,10 +69,10 @@ fn main() {
                 let packages = paru::parse_paru_output(&output);
                 println!("Found {} AUR updates", packages.len());
                 all_packages.extend(packages);
-            }
+            },
             Err(e) => {
                 eprintln!("Warning: Could not scan AUR updates: {e:?}");
-            }
+            },
         }
     }
 
@@ -88,24 +90,21 @@ fn main() {
             UIEvent::UpdateEntireSystem => {
                 let ignored = final_state.get_ignored_packages();
                 execute_update(UpdateMode::EntireSystem, all_packages, ignored, &config);
-            }
+            },
             UIEvent::UpdateOfficialOnly => {
                 let ignored = final_state.get_ignored_packages();
                 execute_update(UpdateMode::OfficialOnly, all_packages, ignored, &config);
-            }
+            },
             UIEvent::Quit => {
                 println!("\nExiting without updates.");
-            }
-            UIEvent::OpenLink(_) => {
-                println!("\nLink opening not yet implemented.");
-            }
+            },
         },
         Ok((None, _)) => {
             println!("\nNo action taken.");
-        }
+        },
         Err(e) => {
             eprintln!("\nTUI error: {e}");
-        }
+        },
     }
 }
 
@@ -133,9 +132,9 @@ fn execute_update(
                     status.code().unwrap_or(-1)
                 );
             }
-        }
+        },
         Err(e) => {
             eprintln!("\n✗ Failed to execute update command: {e}");
-        }
+        },
     }
 }
