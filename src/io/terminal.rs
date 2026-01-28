@@ -60,6 +60,8 @@ pub fn run_tui_with_scan(
 fn start_scan_thread(tx: Sender<ScanMessage>, has_paru: bool) {
     thread::spawn(move || {
         let mut all_packages = Vec::new();
+        let mut official_failed = false;
+        let mut aur_failed = false;
 
         // Scan official packages
         let _ = tx.send(ScanMessage::Progress(
@@ -86,10 +88,8 @@ fn start_scan_thread(tx: Sender<ScanMessage>, has_paru: bool) {
                 all_packages.extend(packages);
             },
             Err(e) => {
+                official_failed = true;
                 let _ = tx.send(ScanMessage::OfficialComplete(Err(format!("{e:?}"))));
-                let _ = tx.send(ScanMessage::ScanWarning(
-                    "Official repositories scan failed".to_string(),
-                ));
                 let _ = tx.send(ScanMessage::Progress(
                     "Warning: Could not scan official repos".to_string(),
                 ));
@@ -115,8 +115,8 @@ fn start_scan_thread(tx: Sender<ScanMessage>, has_paru: bool) {
                     all_packages.extend(packages);
                 },
                 Err(e) => {
+                    aur_failed = true;
                     let _ = tx.send(ScanMessage::AurComplete(Err(format!("{e:?}"))));
-                    let _ = tx.send(ScanMessage::ScanWarning("AUR scan failed".to_string()));
                     let _ = tx.send(ScanMessage::Progress(
                         "Warning: Could not scan AUR packages".to_string(),
                     ));
@@ -124,13 +124,28 @@ fn start_scan_thread(tx: Sender<ScanMessage>, has_paru: bool) {
             }
         }
 
-        // Final message
+        // Final status message
         let total = all_packages.len();
         let _ = tx.send(ScanMessage::Progress(format!(
             "Scan complete. Total: {} update{}",
             total,
             if total == 1 { "" } else { "s" }
         )));
+
+        // Send warning about scan failures
+        if official_failed || aur_failed {
+            let mut failed_sources = Vec::new();
+            if official_failed {
+                failed_sources.push("Official");
+            }
+            if aur_failed {
+                failed_sources.push("AUR");
+            }
+            let _ = tx.send(ScanMessage::ScanWarning(format!(
+                "{} scan failed",
+                failed_sources.join(" & ")
+            )));
+        }
 
         let _ = tx.send(ScanMessage::Complete(all_packages));
     });
