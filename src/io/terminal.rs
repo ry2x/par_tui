@@ -1,5 +1,5 @@
 use crossterm::{
-    event::{self, Event, KeyCode, KeyModifiers},
+    event::{self, Event, KeyCode},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
@@ -47,7 +47,7 @@ fn run_app(
                 (KeyCode::Char('k') | KeyCode::Up, _) => state.move_cursor_up(),
                 (KeyCode::Char('p'), _) => state.toggle_permanent_ignore(),
                 (KeyCode::Char(' '), _) => state.toggle_current_package(),
-                (KeyCode::Enter, KeyModifiers::SHIFT) => {
+                (KeyCode::Char('o'), _) => {
                     return Ok(Some(UIEvent::UpdateOfficialOnly));
                 },
                 (KeyCode::Enter, _) => {

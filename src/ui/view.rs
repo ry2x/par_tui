@@ -121,7 +121,7 @@ fn render_status(frame: &mut Frame, area: Rect, state: &AppState) {
 
 fn render_keybinds(frame: &mut Frame, area: Rect) {
     let keybinds =
-        Paragraph::new("[Enter] Entire  [S-Enter] Official  [Space] Toggle  [p] Perm  [q] Quit")
+        Paragraph::new("[Enter] Entire  [o] Official  [Space] Toggle  [p] Perm  [q] Quit")
             .alignment(Alignment::Center)
             .style(Style::default().fg(Color::DarkGray));
     frame.render_widget(keybinds, area);
@@ -137,7 +137,7 @@ fn render_help_modal(frame: &mut Frame) {
             Span::raw(": Update Entire System (paru)"),
         ]),
         Line::from(vec![
-            Span::styled("[S-Enter] ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::styled("[o]       ", Style::default().add_modifier(Modifier::BOLD)),
             Span::raw(": Update Official Only (pacman)"),
         ]),
         Line::from(vec![
