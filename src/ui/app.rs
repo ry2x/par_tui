@@ -145,6 +145,8 @@ impl AppState {
             && !item.is_permanently_ignored
         {
             item.is_temporarily_ignored = !item.is_temporarily_ignored;
+            // Clear cache as ignore status affects conflict detection
+            self.reverse_deps_cache.clear();
         }
     }
 
@@ -154,6 +156,8 @@ impl AppState {
             if item.is_permanently_ignored {
                 item.is_temporarily_ignored = false;
             }
+            // Clear cache as ignore status affects conflict detection
+            self.reverse_deps_cache.clear();
         }
     }
 
