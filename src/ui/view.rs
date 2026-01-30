@@ -158,6 +158,10 @@ fn render_main(frame: &mut Frame, state: &AppState) {
     if state.show_help {
         render_help_modal(frame);
     }
+
+    if state.show_dependency_warning {
+        render_dependency_warning_modal(frame, state);
+    }
 }
 
 fn render_header(frame: &mut Frame, area: Rect, state: &AppState) {
@@ -360,6 +364,79 @@ fn render_help_modal(frame: &mut Frame) {
 
     frame.render_widget(Clear, area);
     frame.render_widget(help, area);
+}
+
+fn render_dependency_warning_modal(frame: &mut Frame, state: &AppState) {
+    let area = centered_rect(70, 60, frame.area());
+
+    let mut warning_lines = vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            "⚠ DEPENDENCY CONFLICT WARNING ⚠",
+            Style::default()
+                .fg(Color::Red)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            "The following ignored packages are required by packages being updated:",
+            Style::default().fg(Color::Yellow),
+        )),
+        Line::from(""),
+    ];
+
+    for conflict in &state.dependency_conflicts {
+        warning_lines.push(Line::from(vec![
+            Span::styled("  • ", Style::default().fg(Color::Red)),
+            Span::styled(
+                &conflict.ignored_package,
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(" is required by:"),
+        ]));
+
+        for dep in &conflict.required_by {
+            warning_lines.push(Line::from(vec![
+                Span::raw("      → "),
+                Span::styled(dep, Style::default().fg(Color::White)),
+            ]));
+        }
+        warning_lines.push(Line::from(""));
+    }
+
+    warning_lines.extend([
+        Line::from(""),
+        Line::from(Span::styled(
+            "Proceeding may cause a partial upgrade and break your system.",
+            Style::default()
+                .fg(Color::Red)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("[y] ", Style::default().fg(Color::Green)),
+            Span::raw("Proceed anyway  "),
+            Span::styled("[n] ", Style::default().fg(Color::Red)),
+            Span::raw("Cancel  "),
+            Span::styled("[Esc] ", Style::default().fg(Color::DarkGray)),
+            Span::raw("Cancel"),
+        ]),
+    ]);
+
+    let warning = Paragraph::new(warning_lines)
+        .block(
+            Block::default()
+                .title("⚠ WARNING ⚠")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Red))
+                .style(Style::default().bg(Color::Black)),
+        )
+        .alignment(Alignment::Left);
+
+    frame.render_widget(Clear, area);
+    frame.render_widget(warning, area);
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {

@@ -240,13 +240,60 @@ fn run_app_with_loading(
                 (LoadingState::Ready, KeyCode::Char('p')) => state.toggle_permanent_ignore(),
                 (LoadingState::Ready, KeyCode::Char(' ')) => state.toggle_current_package(),
                 (LoadingState::Ready, KeyCode::Char('o')) => {
-                    return Ok(Some(UIEvent::UpdateOfficialOnly));
+                    // Check dependencies before proceeding
+                    state.pending_action = Some(UIEvent::UpdateOfficialOnly);
+                    check_and_warn_dependencies(state);
+                    if !state.show_dependency_warning {
+                        return Ok(state.pending_action.take());
+                    }
                 },
                 (LoadingState::Ready, KeyCode::Enter) => {
-                    return Ok(Some(UIEvent::UpdateEntireSystem));
+                    // Check dependencies before proceeding
+                    state.pending_action = Some(UIEvent::UpdateEntireSystem);
+                    check_and_warn_dependencies(state);
+                    if !state.show_dependency_warning {
+                        return Ok(state.pending_action.take());
+                    }
+                },
+                // Dependency warning modal handlers
+                (LoadingState::Ready, KeyCode::Char('y'))
+                    if state.show_dependency_warning =>
+                {
+                    // User confirmed: proceed despite warnings
+                    state.toggle_dependency_warning();
+                    return Ok(state.pending_action.take());
+                },
+                (LoadingState::Ready, KeyCode::Char('n') | KeyCode::Esc)
+                    if state.show_dependency_warning =>
+                {
+                    // User cancelled
+                    state.toggle_dependency_warning();
+                    state.pending_action = None;
                 },
                 _ => {},
             }
         }
+    }
+}
+
+/// Checks for dependency conflicts and sets warning state if found
+fn check_and_warn_dependencies(state: &mut AppState) {
+    let all_packages: Vec<Package> = state
+        .packages
+        .iter()
+        .map(|item| item.package.clone())
+        .collect();
+
+    let ignored = state.get_ignored_packages();
+
+    let conflicts = crate::core::dependency::detect_conflicts(&all_packages, &ignored, |pkg| {
+        command::get_package_required_by(pkg)
+            .ok()
+            .map(|output| pacman::parse_required_by(&output))
+            .unwrap_or_default()
+    });
+
+    if !conflicts.is_empty() {
+        state.set_dependency_conflicts(conflicts);
     }
 }

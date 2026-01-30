@@ -1,4 +1,5 @@
 use crate::models::package::Package;
+use crate::core::dependency::DependencyConflict;
 
 #[derive(Debug, Clone)]
 pub enum UIEvent {
@@ -24,6 +25,9 @@ pub struct AppState {
     pub loading_state: LoadingState,
     pub loading_message: String,
     pub scan_warnings: Vec<String>,
+    pub dependency_conflicts: Vec<DependencyConflict>,
+    pub show_dependency_warning: bool,
+    pub pending_action: Option<UIEvent>,
 }
 
 #[derive(Debug, Clone)]
@@ -44,6 +48,9 @@ impl AppState {
             loading_state: LoadingState::Scanning,
             loading_message: "Initializing...".to_string(),
             scan_warnings: Vec::new(),
+            dependency_conflicts: Vec::new(),
+            show_dependency_warning: false,
+            pending_action: None,
         }
     }
 
@@ -60,6 +67,9 @@ impl AppState {
             loading_state: LoadingState::Ready,
             loading_message: String::new(),
             scan_warnings: Vec::new(),
+            dependency_conflicts: Vec::new(),
+            show_dependency_warning: false,
+            pending_action: None,
         }
     }
 
@@ -184,5 +194,25 @@ impl AppState {
         self.scan_warnings
             .iter()
             .any(|w| w.contains(crate::io::terminal::OFFICIAL_SCAN_FAILURE_MARKER))
+    }
+
+    /// Toggles dependency warning modal visibility
+    pub fn toggle_dependency_warning(&mut self) {
+        self.show_dependency_warning = !self.show_dependency_warning;
+    }
+
+    /// Sets dependency conflicts and shows warning modal
+    pub fn set_dependency_conflicts(&mut self, conflicts: Vec<DependencyConflict>) {
+        self.dependency_conflicts = conflicts;
+        if !self.dependency_conflicts.is_empty() {
+            self.show_dependency_warning = true;
+        }
+    }
+
+    /// Checks if there are any dependency conflicts
+    #[must_use]
+    #[allow(dead_code)]
+    pub fn has_conflicts(&self) -> bool {
+        !self.dependency_conflicts.is_empty()
     }
 }
