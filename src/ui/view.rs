@@ -367,7 +367,25 @@ fn render_help_modal(frame: &mut Frame) {
 }
 
 fn render_dependency_warning_modal(frame: &mut Frame, state: &AppState) {
-    let area = centered_rect(70, 60, frame.area());
+    // Calculate required height based on content
+    let header_lines = 5; // Title + description
+    let footer_lines = 4; // Warning message + keybinds
+    
+    let mut content_lines = 0;
+    for conflict in &state.dependency_conflicts {
+        content_lines += 1; // Package name line
+        content_lines += conflict.required_by.len(); // Dependency lines
+        content_lines += 1; // Blank line
+    }
+    
+    let total_lines = header_lines + content_lines + footer_lines;
+    
+    // Calculate dynamic size (minimum 40%, maximum 80% of screen height)
+    let max_height = frame.area().height;
+    let required_height = u16::try_from(total_lines + 4).unwrap_or(u16::MAX); // +4 for borders and padding
+    let height_percent = (required_height * 100 / max_height).clamp(40, 80);
+    
+    let area = centered_rect(70, height_percent, frame.area());
 
     let mut warning_lines = vec![
         Line::from(""),
@@ -425,6 +443,7 @@ fn render_dependency_warning_modal(frame: &mut Frame, state: &AppState) {
         ]),
     ]);
 
+    // Use Paragraph with wrap for automatic scrolling if content is too long
     let warning = Paragraph::new(warning_lines)
         .block(
             Block::default()
@@ -433,7 +452,8 @@ fn render_dependency_warning_modal(frame: &mut Frame, state: &AppState) {
                 .border_style(Style::default().fg(Color::Red))
                 .style(Style::default().bg(Color::Black)),
         )
-        .alignment(Alignment::Left);
+        .alignment(Alignment::Left)
+        .wrap(ratatui::widgets::Wrap { trim: false });
 
     frame.render_widget(Clear, area);
     frame.render_widget(warning, area);
