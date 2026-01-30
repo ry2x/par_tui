@@ -13,9 +13,9 @@ use std::sync::{
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
+use crate::io::command;
 use crate::models::config::Config;
 use crate::models::package::Package;
-use crate::io::command;
 use crate::parser::{pacman, paru};
 use crate::ui::{
     app::{AppState, LoadingState, UIEvent},
