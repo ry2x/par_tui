@@ -112,7 +112,6 @@ pub fn check_command_exists(command: &str) -> bool {
 /// # Errors
 ///
 /// Returns `CommandError::ExecutionFailed` if the command fails or package is not found.
-#[allow(dead_code)]
 pub fn get_package_required_by(package: &str) -> Result<String, CommandError> {
     let output = Command::new("pacman")
         .args(["-Qi", package])
