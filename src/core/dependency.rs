@@ -3,7 +3,6 @@ use std::collections::HashSet;
 
 /// Represents a dependency conflict warning.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code)]
 pub struct DependencyConflict {
     pub ignored_package: String,
     pub required_by: Vec<String>,
