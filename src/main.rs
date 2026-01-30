@@ -15,18 +15,25 @@ fn handle_update(
     all_packages: Vec<models::package::Package>,
     config: &models::config::Config,
     mode: UpdateMode,
-) {
+) -> bool {
     let ignored = final_state.get_ignored_packages();
 
     match check_and_confirm_dependencies(final_state, &all_packages, &ignored) {
         Ok(true) => {
             execute_update(mode, all_packages, ignored, config);
+            true
         },
         Ok(false) => {
             // User cancelled, do nothing
+            false
+        },
+        Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {
+            // User quit during confirmation
+            false
         },
         Err(e) => {
             eprintln!("Failed to check dependencies: {e}");
+            false
         },
     }
 }
@@ -151,7 +158,11 @@ fn check_and_confirm_dependencies(
             // Re-enter TUI for confirmation
             match terminal::run_tui_for_confirmation(state)? {
                 Some(UIEvent::UpdateEntireSystem | UIEvent::UpdateOfficialOnly) => Ok(true),
-                _ => Ok(false), // User cancelled or quit
+                Some(UIEvent::Quit) => Err(std::io::Error::new(
+                    std::io::ErrorKind::Interrupted,
+                    "User quit during dependency confirmation",
+                )),
+                _ => Ok(false), // User cancelled
             }
         },
         Err(warnings) => {

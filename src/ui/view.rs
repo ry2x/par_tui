@@ -391,9 +391,8 @@ fn render_dependency_warning_modal(frame: &mut Frame, state: &AppState) {
         u16::try_from(total_lines).unwrap_or(max_height.saturating_mul(80).saturating_div(100));
     let required_height = content_height.saturating_add(chrome_height);
 
-    let height_percent = required_height
-        .saturating_mul(100)
-        .checked_div(max_height)
+    let height_percent = ((u32::from(required_height) * 100) / u32::from(max_height))
+        .try_into()
         .unwrap_or(80)
         .clamp(40, 80);
 
