@@ -218,22 +218,10 @@ fn run_app_with_loading(
         {
             // Handle dependency warning modal first (blocks all other input)
             if state.show_dependency_warning {
-                match key.code {
-                    KeyCode::Char('y') => {
-                        // User confirmed: proceed despite warnings
-                        state.toggle_dependency_warning();
-                        return Ok(state.pending_action.take());
-                    },
-                    KeyCode::Char('n') | KeyCode::Esc => {
-                        // User cancelled
-                        state.toggle_dependency_warning();
-                        state.pending_action = None;
-                    },
-                    KeyCode::Char('q') => {
-                        state.pending_action = None;
-                        return Ok(Some(UIEvent::Quit));
-                    },
-                    _ => {}, // Ignore all other keys when modal is open
+                match handle_dependency_warning_modal(state, key.code) {
+                    ModalResult::Proceed(event) => return Ok(event),
+                    ModalResult::Quit => return Ok(Some(UIEvent::Quit)),
+                    ModalResult::Cancel | ModalResult::IgnoreKey => {},
                 }
                 continue;
             }
@@ -295,6 +283,35 @@ pub fn run_tui_for_confirmation(state: &mut AppState) -> io::Result<Option<UIEve
     result
 }
 
+enum ModalResult {
+    Proceed(Option<UIEvent>),
+    Cancel,
+    Quit,
+    IgnoreKey,
+}
+
+fn handle_dependency_warning_modal(
+    state: &mut AppState,
+    key_code: KeyCode,
+) -> ModalResult {
+    match key_code {
+        KeyCode::Char('y') => {
+            state.toggle_dependency_warning();
+            ModalResult::Proceed(state.pending_action.take())
+        },
+        KeyCode::Char('n') | KeyCode::Esc => {
+            state.toggle_dependency_warning();
+            state.pending_action = None;
+            ModalResult::Cancel
+        },
+        KeyCode::Char('q') => {
+            state.pending_action = None;
+            ModalResult::Quit
+        },
+        _ => ModalResult::IgnoreKey,
+    }
+}
+
 fn run_modal_loop(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     state: &mut AppState,
@@ -304,25 +321,15 @@ fn run_modal_loop(
 
         if event::poll(Duration::from_millis(100))?
             && let Event::Key(key) = event::read()?
+            && let result = handle_dependency_warning_modal(state, key.code)
+            && !matches!(result, ModalResult::IgnoreKey)
         {
-            match key.code {
-                KeyCode::Char('y') => {
-                    // User confirmed: proceed despite warnings
-                    state.toggle_dependency_warning();
-                    return Ok(state.pending_action.take());
-                },
-                KeyCode::Char('n') | KeyCode::Esc => {
-                    // User cancelled
-                    state.toggle_dependency_warning();
-                    state.pending_action = None;
-                    return Ok(None);
-                },
-                KeyCode::Char('q') => {
-                    state.pending_action = None;
-                    return Ok(Some(UIEvent::Quit));
-                },
-                _ => {}, // Ignore all other keys when modal is open
-            }
+            return Ok(match result {
+                ModalResult::Proceed(event) => event,
+                ModalResult::Cancel => None,
+                ModalResult::Quit => Some(UIEvent::Quit),
+                ModalResult::IgnoreKey => unreachable!(),
+            });
         }
     }
 }

@@ -10,6 +10,27 @@ use parser::{pacman, toml as toml_parser};
 use std::path::PathBuf;
 use ui::app::UIEvent;
 
+fn handle_update(
+    final_state: &mut ui::app::AppState,
+    all_packages: Vec<models::package::Package>,
+    config: &models::config::Config,
+    mode: UpdateMode,
+) {
+    let ignored = final_state.get_ignored_packages();
+
+    match check_and_confirm_dependencies(final_state, &all_packages, &ignored) {
+        Ok(true) => {
+            execute_update(mode, all_packages, ignored, config);
+        },
+        Ok(false) => {
+            // User cancelled, do nothing
+        },
+        Err(e) => {
+            eprintln!("Failed to check dependencies: {e}");
+        },
+    }
+}
+
 fn main() {
     // Load config
     let config_home = std::env::var("XDG_CONFIG_HOME").unwrap_or_else(|_| {
@@ -57,54 +78,10 @@ fn main() {
 
                 match event {
                     UIEvent::UpdateEntireSystem => {
-                        let ignored = final_state.get_ignored_packages();
-
-                        // Check dependencies before executing
-                        match check_and_confirm_dependencies(
-                            &mut final_state,
-                            &all_packages,
-                            &ignored,
-                        ) {
-                            Ok(true) => {
-                                execute_update(
-                                    UpdateMode::EntireSystem,
-                                    all_packages,
-                                    ignored,
-                                    &config,
-                                );
-                            },
-                            Ok(false) => {
-                                // User cancelled, do nothing
-                            },
-                            Err(e) => {
-                                eprintln!("Failed to check dependencies: {e}");
-                            },
-                        }
+                        handle_update(&mut final_state, all_packages, &config, UpdateMode::EntireSystem);
                     },
                     UIEvent::UpdateOfficialOnly => {
-                        let ignored = final_state.get_ignored_packages();
-
-                        // Check dependencies before executing
-                        match check_and_confirm_dependencies(
-                            &mut final_state,
-                            &all_packages,
-                            &ignored,
-                        ) {
-                            Ok(true) => {
-                                execute_update(
-                                    UpdateMode::OfficialOnly,
-                                    all_packages,
-                                    ignored,
-                                    &config,
-                                );
-                            },
-                            Ok(false) => {
-                                // User cancelled, do nothing
-                            },
-                            Err(e) => {
-                                eprintln!("Failed to check dependencies: {e}");
-                            },
-                        }
+                        handle_update(&mut final_state, all_packages, &config, UpdateMode::OfficialOnly);
                     },
                     UIEvent::Quit => {},
                     UIEvent::Reload => {
