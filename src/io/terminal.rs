@@ -24,6 +24,10 @@ use crate::{
     parser::{pacman, paru},
 };
 
+/// Scan failure markers for warning messages
+pub const OFFICIAL_SCAN_FAILURE_MARKER: &str = "Official";
+pub const AUR_SCAN_FAILURE_MARKER: &str = "AUR";
+
 pub enum ScanMessage {
     Progress(String),
     ScanWarning(String),
@@ -163,10 +167,10 @@ fn start_scan_thread(
         if official_failed || aur_failed {
             let mut failed_sources = Vec::new();
             if official_failed {
-                failed_sources.push("Official");
+                failed_sources.push(OFFICIAL_SCAN_FAILURE_MARKER);
             }
             if aur_failed {
-                failed_sources.push("AUR");
+                failed_sources.push(AUR_SCAN_FAILURE_MARKER);
             }
             send_or_return!(ScanMessage::ScanWarning(format!(
                 "{} scan failed",
@@ -217,6 +221,13 @@ fn run_app_with_loading(
             match (&state.loading_state, key.code) {
                 // Allow quit in any state
                 (_, KeyCode::Char('q')) => return Ok(Some(UIEvent::Quit)),
+
+                // Allow reload if official scan failed
+                (LoadingState::Ready | LoadingState::NoUpdates, KeyCode::Char('r'))
+                    if state.has_official_scan_failed() =>
+                {
+                    return Ok(Some(UIEvent::Reload));
+                },
 
                 // Only allow other keys when ready
                 (LoadingState::Ready, KeyCode::Char('?')) => state.toggle_help(),
