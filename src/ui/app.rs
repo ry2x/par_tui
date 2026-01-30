@@ -28,7 +28,16 @@ pub struct AppState {
     pub scan_warnings: Vec<String>,
     pub dependency_conflicts: Vec<DependencyConflict>,
     pub show_dependency_warning: bool,
+    
+    /// Pending action lifecycle:
+    /// 1. Set when Enter/o pressed (before dependency check)
+    /// 2. Held during dependency warning modal display
+    /// 3. Consumed (`take()`) when user confirms (y)
+    /// 4. Cleared (None) when user cancels (n/Esc)
     pub pending_action: Option<UIEvent>,
+    
+    /// Cache for `pacman -Qi` reverse dependency queries
+    /// Key: package name, Value: list of packages requiring it
     pub reverse_deps_cache: HashMap<String, Vec<String>>,
 }
 

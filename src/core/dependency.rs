@@ -88,13 +88,14 @@ where
         let required_by = get_required_by(ignored);
 
         // Find conflicts: packages that are being updated and require this ignored package
-        let conflicting: Vec<String> = required_by
+        let mut conflicting: Vec<String> = required_by
             .iter()
             .filter(|dep| updating_packages.contains(dep.as_str()))
             .cloned()
             .collect();
 
         if !conflicting.is_empty() {
+            conflicting.sort();
             conflicts.push(DependencyConflict {
                 ignored_package: ignored.clone(),
                 required_by: conflicting,
@@ -102,6 +103,7 @@ where
         }
     }
 
+    conflicts.sort_by(|a, b| a.ignored_package.cmp(&b.ignored_package));
     conflicts
 }
 
