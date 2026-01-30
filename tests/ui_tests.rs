@@ -203,3 +203,49 @@ fn test_get_permanent_excludes() {
     assert!(permanent_list.contains(&"pkg1".to_string()));
     assert!(permanent_list.contains(&"pkg2".to_string()));
 }
+
+#[test]
+fn test_has_official_scan_failed_no_warnings() {
+    let packages = vec![make_test_package("pkg1", PackageRepository::Official)];
+    let state = AppState::new(packages, &[]);
+
+    assert!(!state.has_official_scan_failed());
+}
+
+#[test]
+fn test_has_official_scan_failed_with_official_failure() {
+    let packages = vec![make_test_package("pkg1", PackageRepository::Official)];
+    let mut state = AppState::new(packages, &[]);
+    state.scan_warnings.push("Official scan failed".to_string());
+
+    assert!(state.has_official_scan_failed());
+}
+
+#[test]
+fn test_has_official_scan_failed_with_aur_failure_only() {
+    let packages = vec![make_test_package("pkg1", PackageRepository::Official)];
+    let mut state = AppState::new(packages, &[]);
+    state.scan_warnings.push("AUR scan failed".to_string());
+
+    assert!(!state.has_official_scan_failed());
+}
+
+#[test]
+fn test_has_official_scan_failed_with_combined_failure() {
+    let packages = vec![make_test_package("pkg1", PackageRepository::Official)];
+    let mut state = AppState::new(packages, &[]);
+    state.scan_warnings.push("Official & AUR scan failed".to_string());
+
+    // Should detect "Official" marker even in combined message
+    assert!(state.has_official_scan_failed());
+}
+
+#[test]
+fn test_scan_failure_marker_constants() {
+    use par_tui::io::terminal::{OFFICIAL_SCAN_FAILURE_MARKER, AUR_SCAN_FAILURE_MARKER};
+
+    // Verify constants are what we expect
+    assert_eq!(OFFICIAL_SCAN_FAILURE_MARKER, "Official");
+    assert_eq!(AUR_SCAN_FAILURE_MARKER, "AUR");
+}
+
