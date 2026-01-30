@@ -38,26 +38,12 @@ fn main() {
     // Launch TUI with async scanning (loop for reload)
     loop {
         match terminal::run_tui_with_scan(&config, has_paru) {
-            Ok((Some(UIEvent::Reload), _)) => {},
+            Ok((Some(UIEvent::Reload), _)) => {
+                // Reload: restart scan, do not save config
+            },
             Ok((Some(event), final_state)) => {
-                // Save permanent excludes if changed
-                let new_permanent = final_state.get_permanent_excludes();
-                if new_permanent != config.exclude.permanent {
-                    let mut updated_config = config.clone();
-                    updated_config.exclude.permanent = new_permanent;
-                    match toml_parser::serialize_config(&updated_config) {
-                        Ok(content) => {
-                            if let Err(e) = file::write_config(&config_path, &content) {
-                                eprintln!("Warning: Could not save config: {e:?}");
-                            } else {
-                                println!("Permanent excludes saved to config.");
-                            }
-                        },
-                        Err(e) => {
-                            eprintln!("Warning: Could not serialize config: {e:?}");
-                        },
-                    }
-                }
+                // Terminating event: save config if changed, then execute
+                save_config_if_changed(&config_path, &config, &final_state);
 
                 // Get all packages from final state
                 let all_packages: Vec<models::package::Package> = final_state
@@ -75,8 +61,10 @@ fn main() {
                         let ignored = final_state.get_ignored_packages();
                         execute_update(UpdateMode::OfficialOnly, all_packages, ignored, &config);
                     },
-                    UIEvent::Reload => unreachable!("Reload handled in outer loop"),
                     UIEvent::Quit => {},
+                    UIEvent::Reload => {
+                        panic!("DESIGN VIOLATION: Reload event should be handled by outer loop only (line 41)")
+                    },
                 }
                 break;
             },
@@ -84,6 +72,30 @@ fn main() {
             Err(e) => {
                 eprintln!("TUI error: {e}");
                 break;
+            },
+        }
+    }
+}
+
+fn save_config_if_changed(
+    config_path: &std::path::Path,
+    config: &models::config::Config,
+    final_state: &ui::app::AppState,
+) {
+    let new_permanent = final_state.get_permanent_excludes();
+    if new_permanent != config.exclude.permanent {
+        let mut updated_config = config.clone();
+        updated_config.exclude.permanent = new_permanent;
+        match toml_parser::serialize_config(&updated_config) {
+            Ok(content) => {
+                if let Err(e) = file::write_config(config_path, &content) {
+                    eprintln!("Warning: Could not save config: {e:?}");
+                } else {
+                    println!("Permanent excludes saved to config.");
+                }
+            },
+            Err(e) => {
+                eprintln!("Warning: Could not serialize config: {e:?}");
             },
         }
     }
