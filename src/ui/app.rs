@@ -1,5 +1,6 @@
 use crate::models::package::Package;
 use crate::core::dependency::DependencyConflict;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub enum UIEvent {
@@ -28,6 +29,7 @@ pub struct AppState {
     pub dependency_conflicts: Vec<DependencyConflict>,
     pub show_dependency_warning: bool,
     pub pending_action: Option<UIEvent>,
+    pub reverse_deps_cache: HashMap<String, Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -51,6 +53,7 @@ impl AppState {
             dependency_conflicts: Vec::new(),
             show_dependency_warning: false,
             pending_action: None,
+            reverse_deps_cache: HashMap::new(),
         }
     }
 
@@ -70,6 +73,7 @@ impl AppState {
             dependency_conflicts: Vec::new(),
             show_dependency_warning: false,
             pending_action: None,
+            reverse_deps_cache: HashMap::new(),
         }
     }
 
@@ -214,5 +218,29 @@ impl AppState {
     #[allow(dead_code)]
     pub fn has_conflicts(&self) -> bool {
         !self.dependency_conflicts.is_empty()
+    }
+
+    /// Gets or fetches reverse dependencies for a package (with caching)
+    ///
+    /// Returns (dependencies, `optional_error_message`)
+    pub fn get_or_fetch_required_by<F>(
+        &mut self,
+        pkg: &str,
+        fetch: F,
+    ) -> (Vec<String>, Option<String>)
+    where
+        F: FnOnce() -> Result<Vec<String>, String>,
+    {
+        if let Some(cached) = self.reverse_deps_cache.get(pkg) {
+            return (cached.clone(), None);
+        }
+
+        match fetch() {
+            Ok(deps) => {
+                self.reverse_deps_cache.insert(pkg.to_string(), deps.clone());
+                (deps, None)
+            },
+            Err(e) => (Vec::new(), Some(e)),
+        }
     }
 }

@@ -1,5 +1,5 @@
 use crate::models::package::Package;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 /// Represents a dependency conflict warning.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -7,6 +7,49 @@ use std::collections::{HashMap, HashSet};
 pub struct DependencyConflict {
     pub ignored_package: String,
     pub required_by: Vec<String>,
+}
+
+/// Result type for dependency operations
+pub type DependencyResult = Result<Vec<DependencyConflict>, Vec<String>>;
+
+/// Checks for dependency conflicts given packages and a resolver function.
+///
+/// # Arguments
+///
+/// * `all_packages` - All packages available for update
+/// * `ignored_packages` - Package names being ignored
+/// * `get_required_by` - Function returning (`package_deps`, `optional_error_message`)
+///
+/// # Returns
+///
+/// Returns `Ok(conflicts)` if check succeeds, `Err(warnings)` if any package queries fail.
+///
+/// # Errors
+///
+/// Returns `Err(Vec<String>)` containing warning messages if dependency queries fail.
+pub fn check_conflicts<F>(
+    all_packages: &[Package],
+    ignored_packages: &[String],
+    mut get_required_by: F,
+) -> DependencyResult
+where
+    F: FnMut(&str) -> (Vec<String>, Option<String>),
+{
+    let mut warnings = Vec::new();
+    
+    let conflicts = detect_conflicts(all_packages, ignored_packages, |pkg| {
+        let (deps, err) = get_required_by(pkg);
+        if let Some(e) = err {
+            warnings.push(format!("Failed to check dependencies for {pkg}: {e}"));
+        }
+        deps
+    });
+
+    if warnings.is_empty() {
+        Ok(conflicts)
+    } else {
+        Err(warnings)
+    }
 }
 
 /// Detects dependency conflicts when packages are ignored.
@@ -40,14 +83,9 @@ where
         .collect();
 
     let mut conflicts = Vec::new();
-    let mut cache: HashMap<String, Vec<String>> = HashMap::new();
 
     for ignored in ignored_packages {
-        // Get or fetch reverse dependencies
-        let required_by = cache
-            .entry(ignored.clone())
-            .or_insert_with(|| get_required_by(ignored))
-            .clone();
+        let required_by = get_required_by(ignored);
 
         // Find conflicts: packages that are being updated and require this ignored package
         let conflicting: Vec<String> = required_by

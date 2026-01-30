@@ -218,6 +218,25 @@ fn run_app_with_loading(
         if event::poll(Duration::from_millis(100))?
             && let Event::Key(key) = event::read()?
         {
+            // Handle dependency warning modal first (blocks all other input)
+            if state.show_dependency_warning {
+                match key.code {
+                    KeyCode::Char('y') => {
+                        // User confirmed: proceed despite warnings
+                        state.toggle_dependency_warning();
+                        return Ok(state.pending_action.take());
+                    },
+                    KeyCode::Char('n') | KeyCode::Esc => {
+                        // User cancelled
+                        state.toggle_dependency_warning();
+                        state.pending_action = None;
+                    },
+                    KeyCode::Char('q') => return Ok(Some(UIEvent::Quit)),
+                    _ => {} // Ignore all other keys when modal is open
+                }
+                continue;
+            }
+
             match (&state.loading_state, key.code) {
                 // Allow quit in any state
                 (_, KeyCode::Char('q')) => return Ok(Some(UIEvent::Quit)),
@@ -255,21 +274,6 @@ fn run_app_with_loading(
                         return Ok(state.pending_action.take());
                     }
                 },
-                // Dependency warning modal handlers
-                (LoadingState::Ready, KeyCode::Char('y'))
-                    if state.show_dependency_warning =>
-                {
-                    // User confirmed: proceed despite warnings
-                    state.toggle_dependency_warning();
-                    return Ok(state.pending_action.take());
-                },
-                (LoadingState::Ready, KeyCode::Char('n') | KeyCode::Esc)
-                    if state.show_dependency_warning =>
-                {
-                    // User cancelled
-                    state.toggle_dependency_warning();
-                    state.pending_action = None;
-                },
                 _ => {},
             }
         }
@@ -286,14 +290,22 @@ fn check_and_warn_dependencies(state: &mut AppState) {
 
     let ignored = state.get_ignored_packages();
 
-    let conflicts = crate::core::dependency::detect_conflicts(&all_packages, &ignored, |pkg| {
-        command::get_package_required_by(pkg)
-            .ok()
-            .map(|output| pacman::parse_required_by(&output))
-            .unwrap_or_default()
-    });
-
-    if !conflicts.is_empty() {
-        state.set_dependency_conflicts(conflicts);
+    match crate::core::dependency::check_conflicts(&all_packages, &ignored, |pkg| {
+        state.get_or_fetch_required_by(pkg, || {
+            command::get_package_required_by(pkg)
+                .map(|output| pacman::parse_required_by(&output))
+                .map_err(|e| e.to_string())
+        })
+    }) {
+        Ok(conflicts) => {
+            if !conflicts.is_empty() {
+                state.set_dependency_conflicts(conflicts);
+            }
+        },
+        Err(warnings) => {
+            for warning in warnings {
+                state.add_scan_warning(warning);
+            }
+        },
     }
 }
