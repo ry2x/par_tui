@@ -1,6 +1,6 @@
 # Maintainer: ry2x <https://github.com/ry2x>
 pkgname=par_tui
-pkgver=0.1.0
+pkgver=0.2.0
 pkgrel=1
 pkgdesc="TUI wrapper for safe Arch Linux system updates with selective package exclusion"
 arch=('x86_64')
