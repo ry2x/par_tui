@@ -223,7 +223,9 @@ fn run_app_with_loading(
                 (_, KeyCode::Char('q')) => return Ok(Some(UIEvent::Quit)),
 
                 // Allow reload if official scan failed
-                (LoadingState::Ready, KeyCode::Char('r')) if state.has_official_scan_failed() => {
+                (LoadingState::Ready | LoadingState::NoUpdates, KeyCode::Char('r'))
+                    if state.has_official_scan_failed() =>
+                {
                     return Ok(Some(UIEvent::Reload));
                 },
 

@@ -63,7 +63,7 @@ fn main() {
                     },
                     UIEvent::Quit => {},
                     UIEvent::Reload => {
-                        panic!("DESIGN VIOLATION: Reload event should be handled by outer loop only (line 41)")
+                        panic!("DESIGN VIOLATION: UIEvent::Reload must be handled by the outer loop (Ok((Some(UIEvent::Reload), _)))")
                     },
                 }
                 break;

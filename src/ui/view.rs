@@ -153,7 +153,7 @@ fn render_main(frame: &mut Frame, state: &AppState) {
     render_header(frame, chunks[0], state);
     render_package_list(frame, chunks[1], state);
     render_status(frame, chunks[2], state);
-    render_keybinds(frame, chunks[3]);
+    render_keybinds(frame, chunks[3], state);
 
     if state.show_help {
         render_help_modal(frame);
@@ -281,11 +281,17 @@ fn render_status(frame: &mut Frame, area: Rect, state: &AppState) {
     frame.render_widget(status, area);
 }
 
-fn render_keybinds(frame: &mut Frame, area: Rect) {
-    let keybinds =
-        Paragraph::new("[Enter] Entire  [o] Official  [Space] Toggle  [p] Perm  [q] Quit")
-            .alignment(Alignment::Center)
-            .style(Style::default().fg(Color::DarkGray));
+fn render_keybinds(frame: &mut Frame, area: Rect, state: &AppState) {
+    let base_keybinds = "[Enter] Entire  [o] Official  [Space] Toggle  [p] Perm  [q] Quit";
+    let keybinds_text = if state.has_official_scan_failed() {
+        format!("{base_keybinds}  [r] Reload")
+    } else {
+        base_keybinds.to_string()
+    };
+    
+    let keybinds = Paragraph::new(keybinds_text)
+        .alignment(Alignment::Center)
+        .style(Style::default().fg(Color::DarkGray));
     frame.render_widget(keybinds, area);
 }
 
@@ -321,6 +327,10 @@ fn render_help_modal(frame: &mut Frame) {
         Line::from(vec![
             Span::styled("[q]       ", Style::default().add_modifier(Modifier::BOLD)),
             Span::raw(": Quit Application"),
+        ]),
+        Line::from(vec![
+            Span::styled("[r]       ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw(": Reload Scan (when failed)"),
         ]),
         Line::from(""),
         Line::from(vec![
