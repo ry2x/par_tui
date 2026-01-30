@@ -183,6 +183,6 @@ impl AppState {
     pub fn has_official_scan_failed(&self) -> bool {
         self.scan_warnings
             .iter()
-            .any(|w| w.contains("Official scan failed"))
+            .any(|w| w.contains(crate::io::terminal::OFFICIAL_SCAN_FAILURE_MARKER))
     }
 }

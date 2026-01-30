@@ -24,6 +24,10 @@ use crate::{
     parser::{pacman, paru},
 };
 
+/// Scan failure markers for warning messages
+pub const OFFICIAL_SCAN_FAILURE_MARKER: &str = "Official";
+pub const AUR_SCAN_FAILURE_MARKER: &str = "AUR";
+
 pub enum ScanMessage {
     Progress(String),
     ScanWarning(String),
@@ -163,10 +167,10 @@ fn start_scan_thread(
         if official_failed || aur_failed {
             let mut failed_sources = Vec::new();
             if official_failed {
-                failed_sources.push("Official");
+                failed_sources.push(OFFICIAL_SCAN_FAILURE_MARKER);
             }
             if aur_failed {
-                failed_sources.push("AUR");
+                failed_sources.push(AUR_SCAN_FAILURE_MARKER);
             }
             send_or_return!(ScanMessage::ScanWarning(format!(
                 "{} scan failed",
