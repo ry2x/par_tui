@@ -4,6 +4,7 @@ use crate::models::package::Package;
 pub enum UIEvent {
     UpdateEntireSystem,
     UpdateOfficialOnly,
+    Reload,
     Quit,
 }
 
@@ -175,5 +176,13 @@ impl AppState {
             .filter(|p| p.is_temporarily_ignored || p.is_permanently_ignored)
             .count();
         (official, aur, ignored)
+    }
+
+    /// Returns true if official scan has failed
+    #[must_use]
+    pub fn has_official_scan_failed(&self) -> bool {
+        self.scan_warnings
+            .iter()
+            .any(|w| w.contains("Official scan failed"))
     }
 }

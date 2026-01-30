@@ -269,7 +269,12 @@ fn render_status(frame: &mut Frame, area: Rect, state: &AppState) {
     let status_line = if state.scan_warnings.is_empty() {
         stats_text
     } else {
-        format!("{} | ⚠ {}", stats_text, state.scan_warnings.join(", "))
+        let warning_text = state.scan_warnings.join(", ");
+        if state.has_official_scan_failed() {
+            format!("{stats_text} | ⚠ {warning_text} (Press [r] to retry)")
+        } else {
+            format!("{stats_text} | ⚠ {warning_text}")
+        }
     };
 
     let status = Paragraph::new(status_line).block(Block::default().borders(Borders::ALL));

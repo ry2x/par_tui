@@ -35,51 +35,57 @@ fn main() {
         return;
     }
 
-    // Launch TUI with async scanning
-    match terminal::run_tui_with_scan(&config, has_paru) {
-        Ok((Some(event), final_state)) => {
-            // Save permanent excludes if changed
-            let new_permanent = final_state.get_permanent_excludes();
-            if new_permanent != config.exclude.permanent {
-                let mut updated_config = config.clone();
-                updated_config.exclude.permanent = new_permanent;
-                match toml_parser::serialize_config(&updated_config) {
-                    Ok(content) => {
-                        if let Err(e) = file::write_config(&config_path, &content) {
-                            eprintln!("Warning: Could not save config: {e:?}");
-                        } else {
-                            println!("Permanent excludes saved to config.");
-                        }
-                    },
-                    Err(e) => {
-                        eprintln!("Warning: Could not serialize config: {e:?}");
-                    },
+    // Launch TUI with async scanning (loop for reload)
+    loop {
+        match terminal::run_tui_with_scan(&config, has_paru) {
+            Ok((Some(UIEvent::Reload), _)) => {},
+            Ok((Some(event), final_state)) => {
+                // Save permanent excludes if changed
+                let new_permanent = final_state.get_permanent_excludes();
+                if new_permanent != config.exclude.permanent {
+                    let mut updated_config = config.clone();
+                    updated_config.exclude.permanent = new_permanent;
+                    match toml_parser::serialize_config(&updated_config) {
+                        Ok(content) => {
+                            if let Err(e) = file::write_config(&config_path, &content) {
+                                eprintln!("Warning: Could not save config: {e:?}");
+                            } else {
+                                println!("Permanent excludes saved to config.");
+                            }
+                        },
+                        Err(e) => {
+                            eprintln!("Warning: Could not serialize config: {e:?}");
+                        },
+                    }
                 }
-            }
 
-            // Get all packages from final state
-            let all_packages: Vec<models::package::Package> = final_state
-                .packages
-                .iter()
-                .map(|item| item.package.clone())
-                .collect();
+                // Get all packages from final state
+                let all_packages: Vec<models::package::Package> = final_state
+                    .packages
+                    .iter()
+                    .map(|item| item.package.clone())
+                    .collect();
 
-            match event {
-                UIEvent::UpdateEntireSystem => {
-                    let ignored = final_state.get_ignored_packages();
-                    execute_update(UpdateMode::EntireSystem, all_packages, ignored, &config);
-                },
-                UIEvent::UpdateOfficialOnly => {
-                    let ignored = final_state.get_ignored_packages();
-                    execute_update(UpdateMode::OfficialOnly, all_packages, ignored, &config);
-                },
-                UIEvent::Quit => {},
-            }
-        },
-        Ok((None, _)) => {},
-        Err(e) => {
-            eprintln!("TUI error: {e}");
-        },
+                match event {
+                    UIEvent::UpdateEntireSystem => {
+                        let ignored = final_state.get_ignored_packages();
+                        execute_update(UpdateMode::EntireSystem, all_packages, ignored, &config);
+                    },
+                    UIEvent::UpdateOfficialOnly => {
+                        let ignored = final_state.get_ignored_packages();
+                        execute_update(UpdateMode::OfficialOnly, all_packages, ignored, &config);
+                    },
+                    UIEvent::Reload => unreachable!("Reload handled in outer loop"),
+                    UIEvent::Quit => {},
+                }
+                break;
+            },
+            Ok((None, _)) => break,
+            Err(e) => {
+                eprintln!("TUI error: {e}");
+                break;
+            },
+        }
     }
 }
 
