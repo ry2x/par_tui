@@ -104,3 +104,26 @@ pub fn check_command_exists(command: &str) -> bool {
         .map(|output| output.status.success())
         .unwrap_or(false)
 }
+
+/// Gets the list of packages that depend on the specified package.
+///
+/// Uses `pacman -Qi <package>` to retrieve the "Required By" field.
+///
+/// # Errors
+///
+/// Returns `CommandError::ExecutionFailed` if the command fails or package is not found.
+#[allow(dead_code)]
+pub fn get_package_required_by(package: &str) -> Result<String, CommandError> {
+    let output = Command::new("pacman")
+        .args(["-Qi", package])
+        .output()
+        .map_err(|e| CommandError::ExecutionFailed(e.to_string()))?;
+
+    if !output.status.success() {
+        return Err(CommandError::ExecutionFailed(format!(
+            "Package '{package}' not found"
+        )));
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
