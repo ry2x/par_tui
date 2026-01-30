@@ -13,15 +13,13 @@ use std::sync::{
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
+use crate::io::command;
 use crate::models::config::Config;
 use crate::models::package::Package;
+use crate::parser::{pacman, paru};
 use crate::ui::{
     app::{AppState, LoadingState, UIEvent},
     view,
-};
-use crate::{
-    io::command,
-    parser::{pacman, paru},
 };
 
 /// Scan failure markers for warning messages
@@ -218,6 +216,16 @@ fn run_app_with_loading(
         if event::poll(Duration::from_millis(100))?
             && let Event::Key(key) = event::read()?
         {
+            // Handle dependency warning modal first (blocks all other input)
+            if state.show_dependency_warning {
+                match handle_dependency_warning_modal(state, key.code) {
+                    ModalResult::Proceed(event) => return Ok(event),
+                    ModalResult::Quit => return Ok(Some(UIEvent::Quit)),
+                    ModalResult::Cancel | ModalResult::IgnoreKey => {},
+                }
+                continue;
+            }
+
             match (&state.loading_state, key.code) {
                 // Allow quit in any state
                 (_, KeyCode::Char('q')) => return Ok(Some(UIEvent::Quit)),
@@ -240,13 +248,88 @@ fn run_app_with_loading(
                 (LoadingState::Ready, KeyCode::Char('p')) => state.toggle_permanent_ignore(),
                 (LoadingState::Ready, KeyCode::Char(' ')) => state.toggle_current_package(),
                 (LoadingState::Ready, KeyCode::Char('o')) => {
+                    state.pending_action = Some(UIEvent::UpdateOfficialOnly);
                     return Ok(Some(UIEvent::UpdateOfficialOnly));
                 },
                 (LoadingState::Ready, KeyCode::Enter) => {
+                    state.pending_action = Some(UIEvent::UpdateEntireSystem);
                     return Ok(Some(UIEvent::UpdateEntireSystem));
                 },
                 _ => {},
             }
+        }
+    }
+}
+
+/// Runs the TUI for dependency conflict confirmation modal only.
+/// State must already have `dependency_conflicts` set and `show_dependency_warning` = true.
+///
+/// # Errors
+///
+/// Returns an I/O error if terminal operations fail.
+pub fn run_tui_for_confirmation(state: &mut AppState) -> io::Result<Option<UIEvent>> {
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    let result = run_modal_loop(&mut terminal, state);
+
+    disable_raw_mode()?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    terminal.show_cursor()?;
+
+    result
+}
+
+enum ModalResult {
+    Proceed(Option<UIEvent>),
+    Cancel,
+    Quit,
+    IgnoreKey,
+}
+
+fn handle_dependency_warning_modal(
+    state: &mut AppState,
+    key_code: KeyCode,
+) -> ModalResult {
+    match key_code {
+        KeyCode::Char('y') => {
+            state.toggle_dependency_warning();
+            ModalResult::Proceed(state.pending_action.take())
+        },
+        KeyCode::Char('n') | KeyCode::Esc => {
+            state.toggle_dependency_warning();
+            state.pending_action = None;
+            ModalResult::Cancel
+        },
+        KeyCode::Char('q') => {
+            state.pending_action = None;
+            ModalResult::Quit
+        },
+        _ => ModalResult::IgnoreKey,
+    }
+}
+
+fn run_modal_loop(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    state: &mut AppState,
+) -> io::Result<Option<UIEvent>> {
+    loop {
+        terminal.draw(|frame| view::render(frame, state))?;
+
+        if event::poll(Duration::from_millis(100))?
+            && let Event::Key(key) = event::read()?
+            && let result = handle_dependency_warning_modal(state, key.code)
+            && !matches!(result, ModalResult::IgnoreKey)
+        {
+            return Ok(match result {
+                ModalResult::Proceed(event) => event,
+                ModalResult::Cancel => None,
+                ModalResult::Quit => Some(UIEvent::Quit),
+                ModalResult::IgnoreKey => unreachable!(),
+            });
         }
     }
 }

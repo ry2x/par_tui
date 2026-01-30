@@ -6,9 +6,37 @@ mod ui;
 
 use core::planner::{self, UpdateMode};
 use io::{command, file, terminal};
-use parser::toml as toml_parser;
+use parser::{pacman, toml as toml_parser};
 use std::path::PathBuf;
 use ui::app::UIEvent;
+
+fn handle_update(
+    final_state: &mut ui::app::AppState,
+    all_packages: Vec<models::package::Package>,
+    config: &models::config::Config,
+    mode: UpdateMode,
+) -> bool {
+    let ignored = final_state.get_ignored_packages();
+
+    match check_and_confirm_dependencies(final_state, &all_packages, &ignored) {
+        Ok(true) => {
+            execute_update(mode, all_packages, ignored, config);
+            true
+        },
+        Ok(false) => {
+            // User cancelled, do nothing
+            false
+        },
+        Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {
+            // User quit during confirmation
+            false
+        },
+        Err(e) => {
+            eprintln!("Failed to check dependencies: {e}");
+            false
+        },
+    }
+}
 
 fn main() {
     // Load config
@@ -41,9 +69,12 @@ fn main() {
             Ok((Some(UIEvent::Reload), _)) => {
                 // Reload: restart scan, do not save config
             },
-            Ok((Some(event), final_state)) => {
+            Ok((Some(event), mut final_state)) => {
                 // Terminating event: save config if changed, then execute
-                save_config_if_changed(&config_path, &config, &final_state);
+                // Skip saving if state is not ready (e.g., quit during scan)
+                if final_state.is_ready() {
+                    save_config_if_changed(&config_path, &config, &final_state);
+                }
 
                 // Get all packages from final state
                 let all_packages: Vec<models::package::Package> = final_state
@@ -54,16 +85,16 @@ fn main() {
 
                 match event {
                     UIEvent::UpdateEntireSystem => {
-                        let ignored = final_state.get_ignored_packages();
-                        execute_update(UpdateMode::EntireSystem, all_packages, ignored, &config);
+                        handle_update(&mut final_state, all_packages, &config, UpdateMode::EntireSystem);
                     },
                     UIEvent::UpdateOfficialOnly => {
-                        let ignored = final_state.get_ignored_packages();
-                        execute_update(UpdateMode::OfficialOnly, all_packages, ignored, &config);
+                        handle_update(&mut final_state, all_packages, &config, UpdateMode::OfficialOnly);
                     },
                     UIEvent::Quit => {},
                     UIEvent::Reload => {
-                        panic!("DESIGN VIOLATION: UIEvent::Reload must be handled by the outer loop (Ok((Some(UIEvent::Reload), _)))")
+                        panic!(
+                            "DESIGN VIOLATION: UIEvent::Reload must be handled by the outer loop (Ok((Some(UIEvent::Reload), _)))"
+                        )
                     },
                 }
                 break;
@@ -98,6 +129,48 @@ fn save_config_if_changed(
                 eprintln!("Warning: Could not serialize config: {e:?}");
             },
         }
+    }
+}
+
+fn check_and_confirm_dependencies(
+    state: &mut ui::app::AppState,
+    all_packages: &[models::package::Package],
+    ignored: &[String],
+) -> std::io::Result<bool> {
+    // Perform dependency check (orchestration: main.rs calls core and parser)
+    match core::dependency::check_conflicts(all_packages, ignored, |pkg| {
+        state.get_or_fetch_required_by(pkg, || {
+            command::get_package_required_by(pkg)
+                .map(|output| pacman::parse_required_by(&output))
+                .map_err(|e| e.to_string())
+        })
+    }) {
+        Ok(conflicts) => {
+            if conflicts.is_empty() {
+                // No conflicts, proceed
+                return Ok(true);
+            }
+
+            // Conflicts found, show modal for user decision
+            state.set_dependency_conflicts(conflicts);
+            state.show_dependency_warning = true;
+
+            // Re-enter TUI for confirmation
+            match terminal::run_tui_for_confirmation(state)? {
+                Some(UIEvent::UpdateEntireSystem | UIEvent::UpdateOfficialOnly) => Ok(true),
+                Some(UIEvent::Quit) => Err(std::io::Error::new(
+                    std::io::ErrorKind::Interrupted,
+                    "User quit during dependency confirmation",
+                )),
+                _ => Ok(false), // User cancelled
+            }
+        },
+        Err(warnings) => {
+            for warning in warnings {
+                eprintln!("Dependency check warning: {warning}");
+            }
+            Ok(false) // Don't proceed if dependency check failed
+        },
     }
 }
 

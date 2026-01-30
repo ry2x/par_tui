@@ -158,6 +158,10 @@ fn render_main(frame: &mut Frame, state: &AppState) {
     if state.show_help {
         render_help_modal(frame);
     }
+
+    if state.show_dependency_warning {
+        render_dependency_warning_modal(frame, state);
+    }
 }
 
 fn render_header(frame: &mut Frame, area: Rect, state: &AppState) {
@@ -288,7 +292,7 @@ fn render_keybinds(frame: &mut Frame, area: Rect, state: &AppState) {
     } else {
         base_keybinds.to_string()
     };
-    
+
     let keybinds = Paragraph::new(keybinds_text)
         .alignment(Alignment::Center)
         .style(Style::default().fg(Color::DarkGray));
@@ -360,6 +364,111 @@ fn render_help_modal(frame: &mut Frame) {
 
     frame.render_widget(Clear, area);
     frame.render_widget(help, area);
+}
+
+fn render_dependency_warning_modal(frame: &mut Frame, state: &AppState) {
+    // Calculate required height based on content
+    let header_lines = 5; // Empty + title + empty + description + empty
+    let footer_lines = 4; // Empty + warning + empty + keybinds
+
+    let mut content_lines = 0;
+    for conflict in &state.dependency_conflicts {
+        content_lines += 1; // Package name line ("• pkg is required by:")
+        content_lines += conflict.required_by.len(); // Each "→ dep" line
+        content_lines += 1; // Blank line separator
+    }
+
+    let total_lines = header_lines + content_lines + footer_lines;
+
+    // Calculate dynamic size (minimum 40%, maximum 80% of screen height)
+    let max_height = frame.area().height.max(1); // Prevent division by zero
+
+    // Convert content lines to terminal rows, then add vertical chrome
+    // Border: 2 rows (top and bottom of Block)
+    // Padding: 0 rows (Block default has no padding)
+    let chrome_height: u16 = 2;
+    let content_height =
+        u16::try_from(total_lines).unwrap_or(max_height.saturating_mul(80).saturating_div(100));
+    let required_height = content_height.saturating_add(chrome_height);
+
+    let height_percent = ((u32::from(required_height) * 100) / u32::from(max_height))
+        .try_into()
+        .unwrap_or(80)
+        .clamp(40, 80);
+
+    let area = centered_rect(70, height_percent, frame.area());
+
+    let mut warning_lines = vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            "⚠ DEPENDENCY CONFLICT WARNING ⚠",
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            "The following ignored packages are required by packages being updated:",
+            Style::default().fg(Color::Yellow),
+        )),
+        Line::from(""),
+    ];
+
+    for conflict in &state.dependency_conflicts {
+        warning_lines.push(Line::from(vec![
+            Span::styled("  • ", Style::default().fg(Color::Red)),
+            Span::styled(
+                &conflict.ignored_package,
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(" is required by:"),
+        ]));
+
+        for dep in &conflict.required_by {
+            warning_lines.push(Line::from(vec![
+                Span::raw("      → "),
+                Span::styled(dep, Style::default().fg(Color::White)),
+            ]));
+        }
+        warning_lines.push(Line::from(""));
+    }
+
+    warning_lines.extend([
+        Line::from(""),
+        Line::from(Span::styled(
+            "Proceeding may cause a partial upgrade and break your system.",
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("[y] ", Style::default().fg(Color::Green)),
+            Span::raw("Proceed anyway  "),
+            Span::styled("[n] ", Style::default().fg(Color::Red)),
+            Span::raw("Cancel  "),
+            Span::styled("[Esc] ", Style::default().fg(Color::DarkGray)),
+            Span::raw("Cancel"),
+        ]),
+    ]);
+
+    // Use Paragraph with wrap to handle long lines gracefully
+    // LIMITATION: Dynamic height calculation assumes no text wrapping.
+    // If package names exceed modal width, wrapped lines will increase
+    // actual height beyond calculated value, potentially cutting off content.
+    // For production use, consider implementing proper scrolling or using
+    // fixed maximum height with scroll state.
+    let warning = Paragraph::new(warning_lines)
+        .block(
+            Block::default()
+                .title("⚠ WARNING ⚠")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Red))
+                .style(Style::default().bg(Color::Black)),
+        )
+        .alignment(Alignment::Left)
+        .wrap(ratatui::widgets::Wrap { trim: false });
+
+    frame.render_widget(Clear, area);
+    frame.render_widget(warning, area);
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {

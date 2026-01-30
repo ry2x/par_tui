@@ -234,7 +234,9 @@ fn test_has_official_scan_failed_with_aur_failure_only() {
 fn test_has_official_scan_failed_with_combined_failure() {
     let packages = vec![make_test_package("pkg1", PackageRepository::Official)];
     let mut state = AppState::new(packages, &[]);
-    state.scan_warnings.push("Official & AUR scan failed".to_string());
+    state
+        .scan_warnings
+        .push("Official & AUR scan failed".to_string());
 
     // Should detect "Official" marker even in combined message
     assert!(state.has_official_scan_failed());
@@ -242,10 +244,164 @@ fn test_has_official_scan_failed_with_combined_failure() {
 
 #[test]
 fn test_scan_failure_marker_constants() {
-    use par_tui::io::terminal::{OFFICIAL_SCAN_FAILURE_MARKER, AUR_SCAN_FAILURE_MARKER};
+    use par_tui::io::terminal::{AUR_SCAN_FAILURE_MARKER, OFFICIAL_SCAN_FAILURE_MARKER};
 
     // Verify constants are what we expect
     assert_eq!(OFFICIAL_SCAN_FAILURE_MARKER, "Official");
     assert_eq!(AUR_SCAN_FAILURE_MARKER, "AUR");
 }
 
+// Phase 2: UI Integration Tests for dependency warnings
+
+#[test]
+fn test_set_dependency_conflicts_shows_modal() {
+    use par_tui::core::dependency::DependencyConflict;
+
+    let packages = vec![make_test_package("pkg1", PackageRepository::Official)];
+    let mut state = AppState::new(packages, &[]);
+
+    assert!(!state.show_dependency_warning);
+
+    let conflicts = vec![DependencyConflict {
+        ignored_package: "glibc".to_string(),
+        required_by: vec!["systemd".to_string()],
+    }];
+
+    state.set_dependency_conflicts(conflicts);
+
+    assert!(state.show_dependency_warning);
+    assert_eq!(state.dependency_conflicts.len(), 1);
+}
+
+#[test]
+fn test_toggle_dependency_warning() {
+    let packages = vec![make_test_package("pkg1", PackageRepository::Official)];
+    let mut state = AppState::new(packages, &[]);
+
+    assert!(!state.show_dependency_warning);
+
+    state.toggle_dependency_warning();
+    assert!(state.show_dependency_warning);
+
+    state.toggle_dependency_warning();
+    assert!(!state.show_dependency_warning);
+}
+
+#[test]
+fn test_has_conflicts() {
+    use par_tui::core::dependency::DependencyConflict;
+
+    let packages = vec![make_test_package("pkg1", PackageRepository::Official)];
+    let mut state = AppState::new(packages, &[]);
+
+    assert!(!state.has_conflicts());
+
+    state.dependency_conflicts.push(DependencyConflict {
+        ignored_package: "test".to_string(),
+        required_by: vec!["dep".to_string()],
+    });
+
+    assert!(state.has_conflicts());
+}
+
+#[test]
+fn test_pending_action_lifecycle() {
+    use par_tui::ui::app::UIEvent;
+
+    let packages = vec![make_test_package("pkg1", PackageRepository::Official)];
+    let mut state = AppState::new(packages, &[]);
+
+    // Initially None
+    assert!(state.pending_action.is_none());
+
+    // Set action
+    state.pending_action = Some(UIEvent::UpdateEntireSystem);
+    assert!(state.pending_action.is_some());
+
+    // Take consumes it
+    let action = state.pending_action.take();
+    assert!(matches!(action, Some(UIEvent::UpdateEntireSystem)));
+    assert!(state.pending_action.is_none());
+
+    // Clear sets to None
+    state.pending_action = Some(UIEvent::UpdateOfficialOnly);
+    state.pending_action = None;
+    assert!(state.pending_action.is_none());
+}
+
+#[test]
+fn test_reverse_deps_cache() {
+    let packages = vec![make_test_package("pkg1", PackageRepository::Official)];
+    let mut state = AppState::new(packages, &[]);
+
+    let mut call_count = 0;
+
+    // First call: cache miss, fetch called
+    let (deps1, err1) = state.get_or_fetch_required_by("glibc", || {
+        call_count += 1;
+        Ok(vec!["systemd".to_string(), "bash".to_string()])
+    });
+    assert_eq!(call_count, 1);
+    assert_eq!(deps1.len(), 2);
+    assert!(err1.is_none());
+
+    // Second call: cache hit, fetch not called
+    let (deps2, err2) = state.get_or_fetch_required_by("glibc", || {
+        call_count += 1;
+        Ok(vec![]) // Should not be reached
+    });
+    assert_eq!(call_count, 1); // No increment - cache was used
+    assert_eq!(deps2.len(), 2);
+    assert!(err2.is_none());
+
+    // Different package: cache miss again
+    let (deps3, err3) = state.get_or_fetch_required_by("bash", || {
+        call_count += 1;
+        Ok(vec!["base".to_string()])
+    });
+    assert_eq!(call_count, 2);
+    assert_eq!(deps3.len(), 1);
+    assert!(err3.is_none());
+}
+
+#[test]
+fn test_reverse_deps_cache_error_handling() {
+    let packages = vec![make_test_package("pkg1", PackageRepository::Official)];
+    let mut state = AppState::new(packages, &[]);
+
+    // Fetch error: not cached
+    let (deps1, err1) =
+        state.get_or_fetch_required_by("nonexistent", || Err("Package not found".to_string()));
+    assert!(deps1.is_empty());
+    assert_eq!(err1, Some("Package not found".to_string()));
+
+    // Error result is not cached: fetch called again
+    let (deps2, err2) =
+        state.get_or_fetch_required_by("nonexistent", || Err("Still not found".to_string()));
+    assert!(deps2.is_empty());
+    assert_eq!(err2, Some("Still not found".to_string()));
+}
+
+#[test]
+fn test_is_ready_states() {
+    use par_tui::ui::app::LoadingState;
+
+    let packages = vec![make_test_package("pkg1", PackageRepository::Official)];
+    let mut state = AppState::new(packages, &[]);
+
+    // Ready state
+    state.loading_state = LoadingState::Ready;
+    assert!(state.is_ready());
+
+    // NoUpdates state
+    state.loading_state = LoadingState::NoUpdates;
+    assert!(state.is_ready());
+
+    // Scanning state (not ready)
+    state.loading_state = LoadingState::Scanning;
+    assert!(!state.is_ready());
+
+    // Error state (not ready)
+    state.loading_state = LoadingState::Error("test".to_string());
+    assert!(!state.is_ready());
+}

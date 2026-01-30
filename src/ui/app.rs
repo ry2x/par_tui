@@ -1,4 +1,6 @@
+use crate::core::dependency::DependencyConflict;
 use crate::models::package::Package;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub enum UIEvent {
@@ -24,6 +26,19 @@ pub struct AppState {
     pub loading_state: LoadingState,
     pub loading_message: String,
     pub scan_warnings: Vec<String>,
+    pub dependency_conflicts: Vec<DependencyConflict>,
+    pub show_dependency_warning: bool,
+
+    /// Pending action lifecycle:
+    /// 1. Set when Enter/o pressed (before dependency check)
+    /// 2. Held during dependency warning modal display
+    /// 3. Consumed (`take()`) when user confirms (y)
+    /// 4. Cleared (None) when user cancels (n/Esc)
+    pub pending_action: Option<UIEvent>,
+
+    /// Cache for `pacman -Qi` reverse dependency queries
+    /// Key: package name, Value: list of packages requiring it
+    pub reverse_deps_cache: HashMap<String, Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -44,6 +59,10 @@ impl AppState {
             loading_state: LoadingState::Scanning,
             loading_message: "Initializing...".to_string(),
             scan_warnings: Vec::new(),
+            dependency_conflicts: Vec::new(),
+            show_dependency_warning: false,
+            pending_action: None,
+            reverse_deps_cache: HashMap::new(),
         }
     }
 
@@ -60,6 +79,10 @@ impl AppState {
             loading_state: LoadingState::Ready,
             loading_message: String::new(),
             scan_warnings: Vec::new(),
+            dependency_conflicts: Vec::new(),
+            show_dependency_warning: false,
+            pending_action: None,
+            reverse_deps_cache: HashMap::new(),
         }
     }
 
@@ -74,6 +97,8 @@ impl AppState {
     pub fn set_packages(&mut self, packages: Vec<Package>, permanent_excludes: &[String]) {
         self.packages = Self::create_package_items(packages, permanent_excludes);
         self.loading_state = LoadingState::Ready;
+        // Clear cache when packages are reloaded as system state may have changed
+        self.reverse_deps_cache.clear();
     }
 
     /// Helper to create `PackageItem` list from packages and permanent exclusions
@@ -120,6 +145,8 @@ impl AppState {
             && !item.is_permanently_ignored
         {
             item.is_temporarily_ignored = !item.is_temporarily_ignored;
+            // Clear cache as ignore status affects conflict detection
+            self.reverse_deps_cache.clear();
         }
     }
 
@@ -129,6 +156,8 @@ impl AppState {
             if item.is_permanently_ignored {
                 item.is_temporarily_ignored = false;
             }
+            // Clear cache as ignore status affects conflict detection
+            self.reverse_deps_cache.clear();
         }
     }
 
@@ -184,5 +213,59 @@ impl AppState {
         self.scan_warnings
             .iter()
             .any(|w| w.contains(crate::io::terminal::OFFICIAL_SCAN_FAILURE_MARKER))
+    }
+
+    /// Returns true if state is ready (not loading/scanning)
+    #[must_use]
+    pub fn is_ready(&self) -> bool {
+        matches!(
+            self.loading_state,
+            LoadingState::Ready | LoadingState::NoUpdates
+        )
+    }
+
+    /// Toggles dependency warning modal visibility
+    pub fn toggle_dependency_warning(&mut self) {
+        self.show_dependency_warning = !self.show_dependency_warning;
+    }
+
+    /// Sets dependency conflicts and shows warning modal
+    pub fn set_dependency_conflicts(&mut self, conflicts: Vec<DependencyConflict>) {
+        self.dependency_conflicts = conflicts;
+        if !self.dependency_conflicts.is_empty() {
+            self.show_dependency_warning = true;
+        }
+    }
+
+    /// Checks if there are any dependency conflicts
+    #[must_use]
+    #[allow(dead_code)]
+    pub fn has_conflicts(&self) -> bool {
+        !self.dependency_conflicts.is_empty()
+    }
+
+    /// Gets or fetches reverse dependencies for a package (with caching)
+    ///
+    /// Returns (dependencies, `optional_error_message`)
+    pub fn get_or_fetch_required_by<F>(
+        &mut self,
+        pkg: &str,
+        fetch: F,
+    ) -> (Vec<String>, Option<String>)
+    where
+        F: FnOnce() -> Result<Vec<String>, String>,
+    {
+        if let Some(cached) = self.reverse_deps_cache.get(pkg) {
+            return (cached.clone(), None);
+        }
+
+        match fetch() {
+            Ok(deps) => {
+                self.reverse_deps_cache
+                    .insert(pkg.to_string(), deps.clone());
+                (deps, None)
+            },
+            Err(e) => (Vec::new(), Some(e)),
+        }
     }
 }
