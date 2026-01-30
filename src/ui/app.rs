@@ -1,5 +1,5 @@
-use crate::models::package::Package;
 use crate::core::dependency::DependencyConflict;
+use crate::models::package::Package;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -28,14 +28,14 @@ pub struct AppState {
     pub scan_warnings: Vec<String>,
     pub dependency_conflicts: Vec<DependencyConflict>,
     pub show_dependency_warning: bool,
-    
+
     /// Pending action lifecycle:
     /// 1. Set when Enter/o pressed (before dependency check)
     /// 2. Held during dependency warning modal display
     /// 3. Consumed (`take()`) when user confirms (y)
     /// 4. Cleared (None) when user cancels (n/Esc)
     pub pending_action: Option<UIEvent>,
-    
+
     /// Cache for `pacman -Qi` reverse dependency queries
     /// Key: package name, Value: list of packages requiring it
     pub reverse_deps_cache: HashMap<String, Vec<String>>,
@@ -97,6 +97,8 @@ impl AppState {
     pub fn set_packages(&mut self, packages: Vec<Package>, permanent_excludes: &[String]) {
         self.packages = Self::create_package_items(packages, permanent_excludes);
         self.loading_state = LoadingState::Ready;
+        // Clear cache when packages are reloaded as system state may have changed
+        self.reverse_deps_cache.clear();
     }
 
     /// Helper to create `PackageItem` list from packages and permanent exclusions
@@ -255,7 +257,8 @@ impl AppState {
 
         match fetch() {
             Ok(deps) => {
-                self.reverse_deps_cache.insert(pkg.to_string(), deps.clone());
+                self.reverse_deps_cache
+                    .insert(pkg.to_string(), deps.clone());
                 (deps, None)
             },
             Err(e) => (Vec::new(), Some(e)),

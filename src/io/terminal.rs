@@ -15,13 +15,11 @@ use std::time::Duration;
 
 use crate::models::config::Config;
 use crate::models::package::Package;
+use crate::io::command;
+use crate::parser::{pacman, paru};
 use crate::ui::{
     app::{AppState, LoadingState, UIEvent},
     view,
-};
-use crate::{
-    io::command,
-    parser::{pacman, paru},
 };
 
 /// Scan failure markers for warning messages
@@ -231,8 +229,11 @@ fn run_app_with_loading(
                         state.toggle_dependency_warning();
                         state.pending_action = None;
                     },
-                    KeyCode::Char('q') => return Ok(Some(UIEvent::Quit)),
-                    _ => {} // Ignore all other keys when modal is open
+                    KeyCode::Char('q') => {
+                        state.pending_action = None;
+                        return Ok(Some(UIEvent::Quit));
+                    },
+                    _ => {}, // Ignore all other keys when modal is open
                 }
                 continue;
             }
@@ -259,20 +260,12 @@ fn run_app_with_loading(
                 (LoadingState::Ready, KeyCode::Char('p')) => state.toggle_permanent_ignore(),
                 (LoadingState::Ready, KeyCode::Char(' ')) => state.toggle_current_package(),
                 (LoadingState::Ready, KeyCode::Char('o')) => {
-                    // Check dependencies before proceeding
                     state.pending_action = Some(UIEvent::UpdateOfficialOnly);
-                    check_and_warn_dependencies(state);
-                    if !state.show_dependency_warning {
-                        return Ok(state.pending_action.take());
-                    }
+                    return Ok(Some(UIEvent::UpdateOfficialOnly));
                 },
                 (LoadingState::Ready, KeyCode::Enter) => {
-                    // Check dependencies before proceeding
                     state.pending_action = Some(UIEvent::UpdateEntireSystem);
-                    check_and_warn_dependencies(state);
-                    if !state.show_dependency_warning {
-                        return Ok(state.pending_action.take());
-                    }
+                    return Ok(Some(UIEvent::UpdateEntireSystem));
                 },
                 _ => {},
             }
@@ -280,32 +273,56 @@ fn run_app_with_loading(
     }
 }
 
-/// Checks for dependency conflicts and sets warning state if found
-fn check_and_warn_dependencies(state: &mut AppState) {
-    let all_packages: Vec<Package> = state
-        .packages
-        .iter()
-        .map(|item| item.package.clone())
-        .collect();
+/// Runs the TUI for dependency conflict confirmation modal only.
+/// State must already have `dependency_conflicts` set and `show_dependency_warning` = true.
+///
+/// # Errors
+///
+/// Returns an I/O error if terminal operations fail.
+pub fn run_tui_for_confirmation(state: &mut AppState) -> io::Result<Option<UIEvent>> {
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
 
-    let ignored = state.get_ignored_packages();
+    let result = run_modal_loop(&mut terminal, state);
 
-    match crate::core::dependency::check_conflicts(&all_packages, &ignored, |pkg| {
-        state.get_or_fetch_required_by(pkg, || {
-            command::get_package_required_by(pkg)
-                .map(|output| pacman::parse_required_by(&output))
-                .map_err(|e| e.to_string())
-        })
-    }) {
-        Ok(conflicts) => {
-            if !conflicts.is_empty() {
-                state.set_dependency_conflicts(conflicts);
+    disable_raw_mode()?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    terminal.show_cursor()?;
+
+    result
+}
+
+fn run_modal_loop(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    state: &mut AppState,
+) -> io::Result<Option<UIEvent>> {
+    loop {
+        terminal.draw(|frame| view::render(frame, state))?;
+
+        if event::poll(Duration::from_millis(100))?
+            && let Event::Key(key) = event::read()?
+        {
+            match key.code {
+                KeyCode::Char('y') => {
+                    // User confirmed: proceed despite warnings
+                    state.toggle_dependency_warning();
+                    return Ok(state.pending_action.take());
+                },
+                KeyCode::Char('n') | KeyCode::Esc => {
+                    // User cancelled
+                    state.toggle_dependency_warning();
+                    state.pending_action = None;
+                    return Ok(None);
+                },
+                KeyCode::Char('q') => {
+                    state.pending_action = None;
+                    return Ok(Some(UIEvent::Quit));
+                },
+                _ => {}, // Ignore all other keys when modal is open
             }
-        },
-        Err(warnings) => {
-            for warning in warnings {
-                state.add_scan_warning(warning);
-            }
-        },
+        }
     }
 }

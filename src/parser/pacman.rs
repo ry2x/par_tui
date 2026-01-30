@@ -42,10 +42,7 @@ pub fn parse_required_by(output: &str) -> Vec<String> {
             if value == "None" || value.is_empty() {
                 return Vec::new();
             }
-            return value
-                .split_whitespace()
-                .map(String::from)
-                .collect();
+            return value.split_whitespace().map(String::from).collect();
         }
     }
     Vec::new()

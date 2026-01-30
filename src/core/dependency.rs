@@ -36,7 +36,7 @@ where
     F: FnMut(&str) -> (Vec<String>, Option<String>),
 {
     let mut warnings = Vec::new();
-    
+
     let conflicts = detect_conflicts(all_packages, ignored_packages, |pkg| {
         let (deps, err) = get_required_by(pkg);
         if let Some(e) = err {
@@ -193,5 +193,64 @@ mod tests {
         let conflicts = detect_conflicts(&packages, &ignored, get_deps);
 
         assert_eq!(conflicts.len(), 2);
+    }
+
+    #[test]
+    fn test_check_conflicts_with_warnings() {
+        let packages = vec![make_package("pkg1"), make_package("pkg2")];
+        let ignored = vec!["glibc".to_string(), "base".to_string()];
+
+        let get_required_by = |name: &str| -> (Vec<String>, Option<String>) {
+            match name {
+                "glibc" => (vec![], Some("Failed to query glibc".to_string())),
+                "base" => (vec!["pkg1".to_string()], None),
+                _ => (vec![], None),
+            }
+        };
+
+        let result = check_conflicts(&packages, &ignored, get_required_by);
+
+        assert!(result.is_err());
+        if let Err(warnings) = result {
+            assert_eq!(warnings.len(), 1);
+            assert!(warnings[0].contains("Failed to check dependencies for glibc"));
+        }
+    }
+
+    #[test]
+    fn test_check_conflicts_success() {
+        let packages = vec![make_package("pkg1"), make_package("pkg2")];
+        let ignored = vec!["glibc".to_string()];
+
+        let get_required_by = |name: &str| -> (Vec<String>, Option<String>) {
+            match name {
+                "glibc" => (vec!["pkg1".to_string(), "pkg2".to_string()], None),
+                _ => (vec![], None),
+            }
+        };
+
+        let result = check_conflicts(&packages, &ignored, get_required_by);
+
+        assert!(result.is_ok());
+        if let Ok(conflicts) = result {
+            assert_eq!(conflicts.len(), 1);
+            assert_eq!(conflicts[0].ignored_package, "glibc");
+            assert_eq!(conflicts[0].required_by.len(), 2);
+        }
+    }
+
+    #[test]
+    fn test_check_conflicts_no_conflicts_no_warnings() {
+        let packages = vec![make_package("pkg1"), make_package("pkg2")];
+        let ignored = vec!["unrelated".to_string()];
+
+        let get_required_by = |_: &str| -> (Vec<String>, Option<String>) { (vec![], None) };
+
+        let result = check_conflicts(&packages, &ignored, get_required_by);
+
+        assert!(result.is_ok());
+        if let Ok(conflicts) = result {
+            assert!(conflicts.is_empty());
+        }
     }
 }
