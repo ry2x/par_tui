@@ -382,3 +382,27 @@ fn test_reverse_deps_cache_error_handling() {
     assert_eq!(err2, Some("Still not found".to_string()));
 }
 
+#[test]
+fn test_is_ready_states() {
+    use par_tui::ui::app::LoadingState;
+    
+    let packages = vec![make_test_package("pkg1", PackageRepository::Official)];
+    let mut state = AppState::new(packages, &[]);
+    
+    // Ready state
+    state.loading_state = LoadingState::Ready;
+    assert!(state.is_ready());
+    
+    // NoUpdates state
+    state.loading_state = LoadingState::NoUpdates;
+    assert!(state.is_ready());
+    
+    // Scanning state (not ready)
+    state.loading_state = LoadingState::Scanning;
+    assert!(!state.is_ready());
+    
+    // Error state (not ready)
+    state.loading_state = LoadingState::Error("test".to_string());
+    assert!(!state.is_ready());
+}
+

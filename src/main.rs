@@ -43,7 +43,10 @@ fn main() {
             },
             Ok((Some(event), final_state)) => {
                 // Terminating event: save config if changed, then execute
-                save_config_if_changed(&config_path, &config, &final_state);
+                // Skip saving if state is not ready (e.g., quit during scan)
+                if final_state.is_ready() {
+                    save_config_if_changed(&config_path, &config, &final_state);
+                }
 
                 // Get all packages from final state
                 let all_packages: Vec<models::package::Package> = final_state

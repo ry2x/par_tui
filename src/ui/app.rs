@@ -209,6 +209,15 @@ impl AppState {
             .any(|w| w.contains(crate::io::terminal::OFFICIAL_SCAN_FAILURE_MARKER))
     }
 
+    /// Returns true if state is ready (not loading/scanning)
+    #[must_use]
+    pub fn is_ready(&self) -> bool {
+        matches!(
+            self.loading_state,
+            LoadingState::Ready | LoadingState::NoUpdates
+        )
+    }
+
     /// Toggles dependency warning modal visibility
     pub fn toggle_dependency_warning(&mut self) {
         self.show_dependency_warning = !self.show_dependency_warning;
