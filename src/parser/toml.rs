@@ -1,7 +1,6 @@
 use crate::models::config::Config;
 
 #[derive(Debug)]
-#[allow(dead_code)]
 pub enum ParseError {
     InvalidToml(String),
 }

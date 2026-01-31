@@ -11,7 +11,6 @@ pub enum UIEvent {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[allow(dead_code)]
 pub enum LoadingState {
     Scanning,
     Ready,

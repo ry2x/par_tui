@@ -65,7 +65,6 @@ where
 /// # Returns
 ///
 /// Vector of conflicts, where ignored packages are required by packages being updated.
-#[allow(dead_code)]
 pub fn detect_conflicts<F>(
     all_packages: &[Package],
     ignored_packages: &[String],

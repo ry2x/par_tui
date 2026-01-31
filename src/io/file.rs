@@ -2,7 +2,6 @@ use std::fs;
 use std::path::Path;
 
 #[derive(Debug)]
-#[allow(dead_code)]
 pub enum FileError {
     ReadFailed(String),
     WriteFailed(String),

@@ -33,7 +33,6 @@ pub fn parse_checkupdates_output(output: &str) -> Vec<Package> {
 /// Returns a vector of package names that depend on the queried package.
 /// Returns empty vector if "Required By" field is "None" or not found.
 #[must_use]
-#[allow(dead_code)]
 pub fn parse_required_by(output: &str) -> Vec<String> {
     for line in output.lines() {
         let trimmed = line.trim();
