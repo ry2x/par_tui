@@ -264,7 +264,7 @@ impl AppState {
                 self.reverse_deps_cache
                     .insert(pkg.to_string(), deps.clone());
                 (deps, None)
-            },
+            }
             Err(e) => (Vec::new(), Some(e)),
         }
     }

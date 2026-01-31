@@ -22,19 +22,19 @@ fn handle_update(
         Ok(true) => {
             execute_update(mode, all_packages, ignored, config);
             true
-        },
+        }
         Ok(false) => {
             // User cancelled, do nothing
             false
-        },
+        }
         Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {
             // User quit during confirmation
             false
-        },
+        }
         Err(e) => {
             eprintln!("Failed to check dependencies: {e}");
             false
-        },
+        }
     }
 }
 
@@ -68,7 +68,7 @@ fn main() {
         match terminal::run_tui_with_scan(&config, has_paru) {
             Ok((Some(UIEvent::Reload), _)) => {
                 // Reload: restart scan, do not save config
-            },
+            }
             Ok((Some(event), mut final_state)) => {
                 // Terminating event: save config if changed, then execute
                 // Skip saving if state is not ready (e.g., quit during scan)
@@ -85,25 +85,35 @@ fn main() {
 
                 match event {
                     UIEvent::UpdateEntireSystem => {
-                        handle_update(&mut final_state, all_packages, &config, UpdateMode::EntireSystem);
-                    },
+                        handle_update(
+                            &mut final_state,
+                            all_packages,
+                            &config,
+                            UpdateMode::EntireSystem,
+                        );
+                    }
                     UIEvent::UpdateOfficialOnly => {
-                        handle_update(&mut final_state, all_packages, &config, UpdateMode::OfficialOnly);
-                    },
-                    UIEvent::Quit => {},
+                        handle_update(
+                            &mut final_state,
+                            all_packages,
+                            &config,
+                            UpdateMode::OfficialOnly,
+                        );
+                    }
+                    UIEvent::Quit => {}
                     UIEvent::Reload => {
                         panic!(
                             "DESIGN VIOLATION: UIEvent::Reload must be handled by the outer loop (Ok((Some(UIEvent::Reload), _)))"
                         )
-                    },
+                    }
                 }
                 break;
-            },
+            }
             Ok((None, _)) => break,
             Err(e) => {
                 eprintln!("TUI error: {e}");
                 break;
-            },
+            }
         }
     }
 }
@@ -124,10 +134,10 @@ fn save_config_if_changed(
                 } else {
                     println!("Permanent excludes saved to config.");
                 }
-            },
+            }
             Err(e) => {
                 eprintln!("Warning: Could not serialize config: {e:?}");
-            },
+            }
         }
     }
 }
@@ -164,13 +174,13 @@ fn check_and_confirm_dependencies(
                 )),
                 _ => Ok(false), // User cancelled
             }
-        },
+        }
         Err(warnings) => {
             for warning in warnings {
                 eprintln!("Dependency check warning: {warning}");
             }
             Ok(false) // Don't proceed if dependency check failed
-        },
+        }
     }
 }
 
@@ -198,9 +208,9 @@ fn execute_update(
                     status.code().unwrap_or(-1)
                 );
             }
-        },
+        }
         Err(e) => {
             eprintln!("\n✗ Failed to execute update command: {e}");
-        },
+        }
     }
 }

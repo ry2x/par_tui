@@ -24,7 +24,7 @@ impl UpdatePlan {
             UpdateMode::EntireSystem => vec!["paru".to_string(), "-Syu".to_string()],
             UpdateMode::OfficialOnly => {
                 vec!["sudo".to_string(), "pacman".to_string(), "-Syu".to_string()]
-            },
+            }
         };
 
         if !self.ignore_list.is_empty() {

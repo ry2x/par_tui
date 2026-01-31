@@ -113,13 +113,13 @@ fn start_scan_thread(
                     if count == 1 { "" } else { "s" }
                 )));
                 all_packages.extend(packages);
-            },
+            }
             Err(e) => {
                 official_failed = true;
                 send_or_return!(ScanMessage::Progress(format!(
                     "Warning: Could not scan official repos: {e:?}"
                 )));
-            },
+            }
         }
 
         // Scan AUR packages
@@ -138,13 +138,13 @@ fn start_scan_thread(
                         if count == 1 { "" } else { "s" }
                     )));
                     all_packages.extend(packages);
-                },
+                }
                 Err(e) => {
                     aur_failed = true;
                     send_or_return!(ScanMessage::Progress(format!(
                         "Warning: Could not scan AUR packages: {e:?}"
                     )));
-                },
+                }
             }
         }
 
@@ -198,17 +198,17 @@ fn run_app_with_loading(
             match msg {
                 ScanMessage::Progress(message) => {
                     state.set_loading_message(message);
-                },
+                }
                 ScanMessage::ScanWarning(warning) => {
                     state.add_scan_warning(warning);
-                },
+                }
                 ScanMessage::Complete(packages) => {
                     if packages.is_empty() {
                         state.set_no_updates();
                     } else {
                         state.set_packages(packages, &config.exclude.permanent);
                     }
-                },
+                }
             }
         }
 
@@ -221,7 +221,7 @@ fn run_app_with_loading(
                 match handle_dependency_warning_modal(state, key.code) {
                     ModalResult::Proceed(event) => return Ok(event),
                     ModalResult::Quit => return Ok(Some(UIEvent::Quit)),
-                    ModalResult::Cancel | ModalResult::IgnoreKey => {},
+                    ModalResult::Cancel | ModalResult::IgnoreKey => {}
                 }
                 continue;
             }
@@ -235,27 +235,27 @@ fn run_app_with_loading(
                     if state.has_official_scan_failed() =>
                 {
                     return Ok(Some(UIEvent::Reload));
-                },
+                }
 
                 // Only allow other keys when ready
                 (LoadingState::Ready, KeyCode::Char('?')) => state.toggle_help(),
                 (LoadingState::Ready, KeyCode::Char('j') | KeyCode::Down) => {
                     state.move_cursor_down();
-                },
+                }
                 (LoadingState::Ready, KeyCode::Char('k') | KeyCode::Up) => {
                     state.move_cursor_up();
-                },
+                }
                 (LoadingState::Ready, KeyCode::Char('p')) => state.toggle_permanent_ignore(),
                 (LoadingState::Ready, KeyCode::Char(' ')) => state.toggle_current_package(),
                 (LoadingState::Ready, KeyCode::Char('o')) => {
                     state.pending_action = Some(UIEvent::UpdateOfficialOnly);
                     return Ok(Some(UIEvent::UpdateOfficialOnly));
-                },
+                }
                 (LoadingState::Ready, KeyCode::Enter) => {
                     state.pending_action = Some(UIEvent::UpdateEntireSystem);
                     return Ok(Some(UIEvent::UpdateEntireSystem));
-                },
-                _ => {},
+                }
+                _ => {}
             }
         }
     }
@@ -290,24 +290,21 @@ enum ModalResult {
     IgnoreKey,
 }
 
-fn handle_dependency_warning_modal(
-    state: &mut AppState,
-    key_code: KeyCode,
-) -> ModalResult {
+fn handle_dependency_warning_modal(state: &mut AppState, key_code: KeyCode) -> ModalResult {
     match key_code {
         KeyCode::Char('y') => {
             state.toggle_dependency_warning();
             ModalResult::Proceed(state.pending_action.take())
-        },
+        }
         KeyCode::Char('n') | KeyCode::Esc => {
             state.toggle_dependency_warning();
             state.pending_action = None;
             ModalResult::Cancel
-        },
+        }
         KeyCode::Char('q') => {
             state.pending_action = None;
             ModalResult::Quit
-        },
+        }
         _ => ModalResult::IgnoreKey,
     }
 }
