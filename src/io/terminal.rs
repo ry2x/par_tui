@@ -1,36 +1,27 @@
 use crossterm::{
-    event::{self, Event, KeyCode},
+    event::{self, Event},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{Terminal, backend::CrosstermBackend};
 use std::io;
-use std::sync::mpsc::{self, Receiver, Sender};
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-};
-use std::thread::{self, JoinHandle};
+use std::sync::mpsc::Receiver;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 
-use crate::io::command;
 use crate::models::config::Config;
-use crate::models::package::Package;
-use crate::parser::{pacman, paru};
 use crate::ui::{
-    app::{AppState, LoadingState, UIEvent},
+    app::{AppState, UIEvent},
+    controller,
     view,
 };
 
-/// Scan failure markers for warning messages
-pub const OFFICIAL_SCAN_FAILURE_MARKER: &str = "Official";
-pub const AUR_SCAN_FAILURE_MARKER: &str = "AUR";
+/// Message types for scan thread communication (re-export from lib root)
+pub use crate::ScanMessage;
 
-pub enum ScanMessage {
-    Progress(String),
-    ScanWarning(String),
-    Complete(Vec<Package>),
-}
+/// Scan failure marker constants (re-export from lib root)
+pub use crate::{AUR_SCAN_FAILURE_MARKER, OFFICIAL_SCAN_FAILURE_MARKER};
 
 /// Runs the TUI with async scanning and returns the user's selected action and final state.
 ///
@@ -39,7 +30,8 @@ pub enum ScanMessage {
 /// Returns an I/O error if terminal operations fail.
 pub fn run_tui_with_scan(
     config: &Config,
-    has_paru: bool,
+    rx: Receiver<ScanMessage>,
+    _cancel_flag: Arc<AtomicBool>,
 ) -> io::Result<(Option<UIEvent>, AppState)> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -49,135 +41,15 @@ pub fn run_tui_with_scan(
 
     let mut state = AppState::new_loading();
 
-    let (tx, rx) = mpsc::channel();
-    let cancel_flag = Arc::new(AtomicBool::new(false));
-    let scan_handle = start_scan_thread(tx, has_paru, Arc::clone(&cancel_flag));
-
     let result = run_app_with_loading(&mut terminal, &mut state, rx, config);
 
-    // Signal thread to stop if still running
-    cancel_flag.store(true, Ordering::Relaxed);
-
-    // Wait for thread to complete and detect panics
-    if scan_handle.join().is_err() {
-        eprintln!("Warning: Scan thread panicked during execution.");
-    }
+    // Caller is responsible for cancelling thread and waiting for join
 
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal.show_cursor()?;
 
     result.map(|event| (event, state))
-}
-
-fn start_scan_thread(
-    tx: Sender<ScanMessage>,
-    has_paru: bool,
-    cancel_flag: Arc<AtomicBool>,
-) -> JoinHandle<()> {
-    thread::spawn(move || {
-        // Helper macro to send message and return early if channel is closed
-        macro_rules! send_or_return {
-            ($msg:expr) => {
-                if tx.send($msg).is_err() {
-                    return;
-                }
-            };
-        }
-
-        let mut all_packages = Vec::new();
-        let mut official_failed = false;
-        let mut aur_failed = false;
-
-        // Scan official packages
-        if cancel_flag.load(Ordering::Relaxed) {
-            return;
-        }
-
-        send_or_return!(ScanMessage::Progress(
-            "Scanning official repositories...".to_string()
-        ));
-
-        let tx_clone = tx.clone();
-        match command::run_checkupdates_with_callback(|attempt, max| {
-            let _ = tx_clone.send(ScanMessage::Progress(format!(
-                "Retrying checkupdates (attempt {attempt}/{max})"
-            )));
-        }) {
-            Ok(output) => {
-                let packages = pacman::parse_checkupdates_output(&output);
-                let count = packages.len();
-                send_or_return!(ScanMessage::Progress(format!(
-                    "Found {} official update{}",
-                    count,
-                    if count == 1 { "" } else { "s" }
-                )));
-                all_packages.extend(packages);
-            }
-            Err(e) => {
-                official_failed = true;
-                send_or_return!(ScanMessage::Progress(format!(
-                    "Warning: Could not scan official repos: {e:?}"
-                )));
-            }
-        }
-
-        // Scan AUR packages
-        if has_paru && !cancel_flag.load(Ordering::Relaxed) {
-            send_or_return!(ScanMessage::Progress(
-                "Scanning AUR packages...".to_string()
-            ));
-
-            match command::run_paru_query_aur() {
-                Ok(output) => {
-                    let packages = paru::parse_paru_output(&output);
-                    let count = packages.len();
-                    send_or_return!(ScanMessage::Progress(format!(
-                        "Found {} AUR update{}",
-                        count,
-                        if count == 1 { "" } else { "s" }
-                    )));
-                    all_packages.extend(packages);
-                }
-                Err(e) => {
-                    aur_failed = true;
-                    send_or_return!(ScanMessage::Progress(format!(
-                        "Warning: Could not scan AUR packages: {e:?}"
-                    )));
-                }
-            }
-        }
-
-        // Check if cancelled before sending final messages
-        if cancel_flag.load(Ordering::Relaxed) {
-            return;
-        }
-
-        // Final status message
-        let total = all_packages.len();
-        send_or_return!(ScanMessage::Progress(format!(
-            "Scan complete. Total: {} update{}",
-            total,
-            if total == 1 { "" } else { "s" }
-        )));
-
-        // Send warning about scan failures
-        if official_failed || aur_failed {
-            let mut failed_sources = Vec::new();
-            if official_failed {
-                failed_sources.push(OFFICIAL_SCAN_FAILURE_MARKER);
-            }
-            if aur_failed {
-                failed_sources.push(AUR_SCAN_FAILURE_MARKER);
-            }
-            send_or_return!(ScanMessage::ScanWarning(format!(
-                "{} scan failed",
-                failed_sources.join(" & ")
-            )));
-        }
-
-        send_or_return!(ScanMessage::Complete(all_packages));
-    })
 }
 
 // Clippy suggests taking `&Receiver` here, but the event loop needs to own
@@ -216,46 +88,8 @@ fn run_app_with_loading(
         if event::poll(Duration::from_millis(100))?
             && let Event::Key(key) = event::read()?
         {
-            // Handle dependency warning modal first (blocks all other input)
-            if state.show_dependency_warning {
-                match handle_dependency_warning_modal(state, key.code) {
-                    ModalResult::Proceed(event) => return Ok(event),
-                    ModalResult::Quit => return Ok(Some(UIEvent::Quit)),
-                    ModalResult::Cancel | ModalResult::IgnoreKey => {}
-                }
-                continue;
-            }
-
-            match (&state.loading_state, key.code) {
-                // Allow quit in any state
-                (_, KeyCode::Char('q')) => return Ok(Some(UIEvent::Quit)),
-
-                // Allow reload if official scan failed
-                (LoadingState::Ready | LoadingState::NoUpdates, KeyCode::Char('r'))
-                    if state.has_official_scan_failed() =>
-                {
-                    return Ok(Some(UIEvent::Reload));
-                }
-
-                // Only allow other keys when ready
-                (LoadingState::Ready, KeyCode::Char('?')) => state.toggle_help(),
-                (LoadingState::Ready, KeyCode::Char('j') | KeyCode::Down) => {
-                    state.move_cursor_down();
-                }
-                (LoadingState::Ready, KeyCode::Char('k') | KeyCode::Up) => {
-                    state.move_cursor_up();
-                }
-                (LoadingState::Ready, KeyCode::Char('p')) => state.toggle_permanent_ignore(),
-                (LoadingState::Ready, KeyCode::Char(' ')) => state.toggle_current_package(),
-                (LoadingState::Ready, KeyCode::Char('o')) => {
-                    state.pending_action = Some(UIEvent::UpdateOfficialOnly);
-                    return Ok(Some(UIEvent::UpdateOfficialOnly));
-                }
-                (LoadingState::Ready, KeyCode::Enter) => {
-                    state.pending_action = Some(UIEvent::UpdateEntireSystem);
-                    return Ok(Some(UIEvent::UpdateEntireSystem));
-                }
-                _ => {}
+            if let Some(event) = controller::handle_key_event(state, key.code) {
+                return Ok(Some(event));
             }
         }
     }
@@ -283,32 +117,6 @@ pub fn run_tui_for_confirmation(state: &mut AppState) -> io::Result<Option<UIEve
     result
 }
 
-enum ModalResult {
-    Proceed(Option<UIEvent>),
-    Cancel,
-    Quit,
-    IgnoreKey,
-}
-
-fn handle_dependency_warning_modal(state: &mut AppState, key_code: KeyCode) -> ModalResult {
-    match key_code {
-        KeyCode::Char('y') => {
-            state.toggle_dependency_warning();
-            ModalResult::Proceed(state.pending_action.take())
-        }
-        KeyCode::Char('n') | KeyCode::Esc => {
-            state.toggle_dependency_warning();
-            state.pending_action = None;
-            ModalResult::Cancel
-        }
-        KeyCode::Char('q') => {
-            state.pending_action = None;
-            ModalResult::Quit
-        }
-        _ => ModalResult::IgnoreKey,
-    }
-}
-
 fn run_modal_loop(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     state: &mut AppState,
@@ -318,15 +126,13 @@ fn run_modal_loop(
 
         if event::poll(Duration::from_millis(100))?
             && let Event::Key(key) = event::read()?
-            && let result = handle_dependency_warning_modal(state, key.code)
-            && !matches!(result, ModalResult::IgnoreKey)
         {
-            return Ok(match result {
-                ModalResult::Proceed(event) => event,
-                ModalResult::Cancel => None,
-                ModalResult::Quit => Some(UIEvent::Quit),
-                ModalResult::IgnoreKey => unreachable!(),
-            });
+            match controller::handle_dependency_warning_modal(state, key.code) {
+                controller::ModalResult::Proceed(event) => return Ok(event),
+                controller::ModalResult::Cancel => return Ok(None),
+                controller::ModalResult::Quit => return Ok(Some(UIEvent::Quit)),
+                controller::ModalResult::IgnoreKey => {}
+            }
         }
     }
 }

@@ -6,9 +6,137 @@ mod ui;
 
 use core::planner::{self, UpdateMode};
 use io::{command, file, terminal};
-use parser::{pacman, toml as toml_parser};
+use models::package::Package;
+use parser::{pacman, paru, toml as toml_parser};
 use std::path::PathBuf;
+use std::sync::mpsc::{self, Sender};
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::thread::{self, JoinHandle};
 use ui::app::UIEvent;
+
+/// Message types for scan thread communication
+pub enum ScanMessage {
+    Progress(String),
+    ScanWarning(String),
+    Complete(Vec<Package>),
+}
+
+/// Scan failure markers for warning messages
+pub const OFFICIAL_SCAN_FAILURE_MARKER: &str = "Official";
+pub const AUR_SCAN_FAILURE_MARKER: &str = "AUR";
+
+/// Starts background thread to scan for package updates.
+///
+/// Sends progress updates via channel and handles cancellation.
+fn start_scan_thread(
+    tx: Sender<ScanMessage>,
+    has_paru: bool,
+    cancel_flag: Arc<AtomicBool>,
+) -> JoinHandle<()> {
+    thread::spawn(move || {
+        // Helper macro to send message and return early if channel is closed
+        macro_rules! send_or_return {
+            ($msg:expr) => {
+                if tx.send($msg).is_err() {
+                    return;
+                }
+            };
+        }
+
+        let mut all_packages = Vec::new();
+        let mut official_failed = false;
+        let mut aur_failed = false;
+
+        // Scan official packages
+        if cancel_flag.load(Ordering::Relaxed) {
+            return;
+        }
+
+        send_or_return!(ScanMessage::Progress(
+            "Scanning official repositories...".to_string()
+        ));
+
+        let tx_clone = tx.clone();
+        match command::run_checkupdates_with_callback(|attempt, max| {
+            let _ = tx_clone.send(ScanMessage::Progress(format!(
+                "Retrying checkupdates (attempt {attempt}/{max})"
+            )));
+        }) {
+            Ok(output) => {
+                let packages = pacman::parse_checkupdates_output(&output);
+                let count = packages.len();
+                send_or_return!(ScanMessage::Progress(format!(
+                    "Found {} official update{}",
+                    count,
+                    if count == 1 { "" } else { "s" }
+                )));
+                all_packages.extend(packages);
+            }
+            Err(e) => {
+                official_failed = true;
+                send_or_return!(ScanMessage::Progress(format!(
+                    "Warning: Could not scan official repos: {e:?}"
+                )));
+            }
+        }
+
+        // Scan AUR packages
+        if has_paru && !cancel_flag.load(Ordering::Relaxed) {
+            send_or_return!(ScanMessage::Progress(
+                "Scanning AUR packages...".to_string()
+            ));
+
+            match command::run_paru_query_aur() {
+                Ok(output) => {
+                    let packages = paru::parse_paru_output(&output);
+                    let count = packages.len();
+                    send_or_return!(ScanMessage::Progress(format!(
+                        "Found {} AUR update{}",
+                        count,
+                        if count == 1 { "" } else { "s" }
+                    )));
+                    all_packages.extend(packages);
+                }
+                Err(e) => {
+                    aur_failed = true;
+                    send_or_return!(ScanMessage::Progress(format!(
+                        "Warning: Could not scan AUR packages: {e:?}"
+                    )));
+                }
+            }
+        }
+
+        // Check if cancelled before sending final messages
+        if cancel_flag.load(Ordering::Relaxed) {
+            return;
+        }
+
+        // Final status message
+        let total = all_packages.len();
+        send_or_return!(ScanMessage::Progress(format!(
+            "Scan complete. Total: {} update{}",
+            total,
+            if total == 1 { "" } else { "s" }
+        )));
+
+        // Send warning about scan failures
+        if official_failed || aur_failed {
+            let mut failed_sources = Vec::new();
+            if official_failed {
+                failed_sources.push(OFFICIAL_SCAN_FAILURE_MARKER);
+            }
+            if aur_failed {
+                failed_sources.push(AUR_SCAN_FAILURE_MARKER);
+            }
+            send_or_return!(ScanMessage::ScanWarning(format!(
+                "{} scan failed",
+                failed_sources.join(" & ")
+            )));
+        }
+
+        send_or_return!(ScanMessage::Complete(all_packages));
+    })
+}
 
 fn handle_update(
     final_state: &mut ui::app::AppState,
@@ -65,11 +193,29 @@ fn main() {
 
     // Launch TUI with async scanning (loop for reload)
     loop {
-        match terminal::run_tui_with_scan(&config, has_paru) {
+        // Setup scan thread
+        let (tx, rx) = mpsc::channel();
+        let cancel_flag = Arc::new(AtomicBool::new(false));
+        let scan_handle = start_scan_thread(tx, has_paru, Arc::clone(&cancel_flag));
+
+        match terminal::run_tui_with_scan(&config, rx, cancel_flag.clone()) {
             Ok((Some(UIEvent::Reload), _)) => {
+                // Signal thread to stop
+                cancel_flag.store(true, Ordering::Relaxed);
+                // Wait for thread to complete
+                if scan_handle.join().is_err() {
+                    eprintln!("Warning: Scan thread panicked during reload.");
+                }
                 // Reload: restart scan, do not save config
             }
             Ok((Some(event), mut final_state)) => {
+                // Signal thread to stop
+                cancel_flag.store(true, Ordering::Relaxed);
+                // Wait for thread to complete
+                if scan_handle.join().is_err() {
+                    eprintln!("Warning: Scan thread panicked during execution.");
+                }
+
                 // Terminating event: save config if changed, then execute
                 // Skip saving if state is not ready (e.g., quit during scan)
                 if final_state.is_ready() {
@@ -100,17 +246,24 @@ fn main() {
                             UpdateMode::OfficialOnly,
                         );
                     }
-                    UIEvent::Quit => {}
-                    UIEvent::Reload => {
-                        panic!(
-                            "DESIGN VIOLATION: UIEvent::Reload must be handled by the outer loop (Ok((Some(UIEvent::Reload), _)))"
-                        )
-                    }
+                    UIEvent::Quit | UIEvent::Reload => {}
                 }
                 break;
             }
-            Ok((None, _)) => break,
+            Ok((None, _)) => {
+                // Signal thread to stop
+                cancel_flag.store(true, Ordering::Relaxed);
+                // Wait for thread to complete
+                if scan_handle.join().is_err() {
+                    eprintln!("Warning: Scan thread panicked during quit.");
+                }
+                break;
+            }
             Err(e) => {
+                // Signal thread to stop
+                cancel_flag.store(true, Ordering::Relaxed);
+                // Wait for thread to complete
+                let _ = scan_handle.join();
                 eprintln!("TUI error: {e}");
                 break;
             }
