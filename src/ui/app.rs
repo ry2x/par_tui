@@ -1,4 +1,5 @@
 use crate::core::dependency::DependencyConflict;
+use crate::core::filter::PackageItem;
 use crate::models::package::Package;
 use std::collections::HashMap;
 
@@ -40,13 +41,6 @@ pub struct AppState {
     pub reverse_deps_cache: HashMap<String, Vec<String>>,
 }
 
-#[derive(Debug, Clone)]
-pub struct PackageItem {
-    pub package: Package,
-    pub is_temporarily_ignored: bool,
-    pub is_permanently_ignored: bool,
-}
-
 impl AppState {
     /// Creates a new `AppState` in loading state.
     #[must_use]
@@ -69,7 +63,7 @@ impl AppState {
     #[must_use]
     #[allow(dead_code)]
     pub fn new(packages: Vec<Package>, permanent_excludes: &[String]) -> Self {
-        let items = Self::create_package_items(packages, permanent_excludes);
+        let items = crate::core::filter::create_package_items(packages, permanent_excludes);
 
         Self {
             packages: items,
@@ -94,28 +88,10 @@ impl AppState {
     }
 
     pub fn set_packages(&mut self, packages: Vec<Package>, permanent_excludes: &[String]) {
-        self.packages = Self::create_package_items(packages, permanent_excludes);
+        self.packages = crate::core::filter::create_package_items(packages, permanent_excludes);
         self.loading_state = LoadingState::Ready;
         // Clear cache when packages are reloaded as system state may have changed
         self.reverse_deps_cache.clear();
-    }
-
-    /// Helper to create `PackageItem` list from packages and permanent exclusions
-    fn create_package_items(
-        packages: Vec<Package>,
-        permanent_excludes: &[String],
-    ) -> Vec<PackageItem> {
-        packages
-            .into_iter()
-            .map(|pkg| {
-                let is_perm = permanent_excludes.contains(&pkg.name);
-                PackageItem {
-                    package: pkg,
-                    is_temporarily_ignored: false,
-                    is_permanently_ignored: is_perm,
-                }
-            })
-            .collect()
     }
 
     pub fn set_no_updates(&mut self) {
@@ -167,43 +143,19 @@ impl AppState {
     /// Returns a list of all ignored package names (temporary + permanent).
     #[must_use]
     pub fn get_ignored_packages(&self) -> Vec<String> {
-        self.packages
-            .iter()
-            .filter(|item| item.is_temporarily_ignored || item.is_permanently_ignored)
-            .map(|item| item.package.name.clone())
-            .collect()
+        crate::core::filter::build_ignore_list(&self.packages)
     }
 
     /// Returns a list of permanently ignored package names.
     #[must_use]
     pub fn get_permanent_excludes(&self) -> Vec<String> {
-        self.packages
-            .iter()
-            .filter(|item| item.is_permanently_ignored)
-            .map(|item| item.package.name.clone())
-            .collect()
+        crate::core::filter::extract_permanent(&self.packages)
     }
 
     /// Returns package statistics: (`official_count`, `aur_count`, `ignored_count`).
     #[must_use]
     pub fn stats(&self) -> (usize, usize, usize) {
-        let official = self
-            .packages
-            .iter()
-            .filter(|p| {
-                matches!(
-                    p.package.repository,
-                    crate::models::package::PackageRepository::Official
-                )
-            })
-            .count();
-        let aur = self.packages.len() - official;
-        let ignored = self
-            .packages
-            .iter()
-            .filter(|p| p.is_temporarily_ignored || p.is_permanently_ignored)
-            .count();
-        (official, aur, ignored)
+        crate::core::filter::calculate_stats(&self.packages)
     }
 
     /// Returns true if official scan has failed

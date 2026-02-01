@@ -1,27 +1,71 @@
-use crate::models::config::Config;
 use crate::models::package::Package;
+use std::collections::HashSet;
 
-/// Applies permanent package exclusions from configuration.
+#[derive(Debug, Clone)]
+pub struct PackageItem {
+    pub package: Package,
+    pub is_temporarily_ignored: bool,
+    pub is_permanently_ignored: bool,
+}
+
+/// Creates `PackageItem` list from packages and permanent exclusions.
 ///
-/// Returns a new vector with excluded packages filtered out.
+/// Uses `HashSet` for `O(1)` exclusion lookups.
 #[must_use]
-#[allow(dead_code)]
-pub fn apply_permanent_excludes(packages: Vec<Package>, config: &Config) -> Vec<Package> {
-    let excludes = &config.exclude.permanent;
+pub fn create_package_items(
+    packages: Vec<Package>,
+    permanent_excludes: &[String],
+) -> Vec<PackageItem> {
+    let excludes: HashSet<&String> = permanent_excludes.iter().collect();
     packages
         .into_iter()
-        .filter(|pkg| !excludes.contains(&pkg.name))
+        .map(|pkg| {
+            let is_perm = excludes.contains(&pkg.name);
+            PackageItem {
+                package: pkg,
+                is_temporarily_ignored: false,
+                is_permanently_ignored: is_perm,
+            }
+        })
         .collect()
 }
 
-/// Applies temporary package exclusions for the current run.
-///
-/// Returns a new vector with excluded packages filtered out.
+/// Returns a list of all ignored package names (temporary + permanent).
 #[must_use]
-#[allow(dead_code)]
-pub fn apply_temporary_excludes(packages: Vec<Package>, temp_excludes: &[String]) -> Vec<Package> {
-    packages
-        .into_iter()
-        .filter(|pkg| !temp_excludes.contains(&pkg.name))
+pub fn build_ignore_list(items: &[PackageItem]) -> Vec<String> {
+    items
+        .iter()
+        .filter(|item| item.is_temporarily_ignored || item.is_permanently_ignored)
+        .map(|item| item.package.name.clone())
         .collect()
+}
+
+/// Returns a list of permanently ignored package names.
+#[must_use]
+pub fn extract_permanent(items: &[PackageItem]) -> Vec<String> {
+    items
+        .iter()
+        .filter(|item| item.is_permanently_ignored)
+        .map(|item| item.package.name.clone())
+        .collect()
+}
+
+/// Returns package statistics: (`official_count`, `aur_count`, `ignored_count`).
+#[must_use]
+pub fn calculate_stats(items: &[PackageItem]) -> (usize, usize, usize) {
+    let official = items
+        .iter()
+        .filter(|p| {
+            matches!(
+                p.package.repository,
+                crate::models::package::PackageRepository::Official
+            )
+        })
+        .count();
+    let aur = items.len() - official;
+    let ignored = items
+        .iter()
+        .filter(|p| p.is_temporarily_ignored || p.is_permanently_ignored)
+        .count();
+    (official, aur, ignored)
 }
