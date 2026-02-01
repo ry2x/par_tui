@@ -5,15 +5,12 @@ use std::time::Duration;
 #[derive(Debug)]
 pub enum CommandError {
     ExecutionFailed(String),
-    #[allow(dead_code)]
-    NotFound(String),
 }
 
 impl std::fmt::Display for CommandError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::ExecutionFailed(msg) => write!(f, "Command execution failed: {msg}"),
-            Self::NotFound(msg) => write!(f, "Command not found: {msg}"),
         }
     }
 }
@@ -59,19 +56,6 @@ where
     Err(CommandError::ExecutionFailed(format!(
         "Failed after {MAX_RETRIES} attempts: {last_error}"
     )))
-}
-
-/// Runs `checkupdates` to scan for official package updates with retry logic.
-///
-/// Retries up to 3 times with 2 second delays on failure.
-///
-/// # Errors
-///
-/// Returns `CommandError::ExecutionFailed` if the command fails to execute
-/// or returns a non-zero exit status after all retries (except exit code 2, which means no updates).
-#[allow(dead_code)]
-pub fn run_checkupdates() -> Result<String, CommandError> {
-    run_checkupdates_with_callback(|_, _| {})
 }
 
 /// Runs `paru -Qua` to query AUR package updates.

@@ -1,5 +1,4 @@
 use crate::models::config::Config;
-use crate::models::package::{Package, PackageRepository};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UpdateMode {
@@ -9,8 +8,6 @@ pub enum UpdateMode {
 
 pub struct UpdatePlan {
     pub mode: UpdateMode,
-    #[allow(dead_code)]
-    pub packages: Vec<Package>,
     pub ignore_list: Vec<String>,
 }
 
@@ -57,24 +54,15 @@ impl UpdatePlan {
 
 /// Creates an update plan with the specified mode and exclusions.
 ///
-/// For `OfficialOnly` mode, AUR packages are automatically filtered out.
+/// The `all_packages` parameter is accepted for future extensibility but not currently used.
 #[must_use]
 pub fn create_plan(
     mode: UpdateMode,
-    all_packages: Vec<Package>,
+    _all_packages: Vec<crate::models::package::Package>,
     excluded: Vec<String>,
 ) -> UpdatePlan {
-    let packages = match mode {
-        UpdateMode::EntireSystem => all_packages,
-        UpdateMode::OfficialOnly => all_packages
-            .into_iter()
-            .filter(|p| p.repository == PackageRepository::Official)
-            .collect(),
-    };
-
     UpdatePlan {
         mode,
-        packages,
         ignore_list: excluded,
     }
 }

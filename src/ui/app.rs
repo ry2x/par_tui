@@ -16,6 +16,7 @@ pub enum LoadingState {
     Scanning,
     Ready,
     NoUpdates,
+    #[allow(dead_code)] // Used in tests and error rendering
     Error(String),
 }
 
@@ -60,6 +61,8 @@ impl AppState {
     }
 
     /// Creates a new `AppState` with the given packages and permanent exclusions.
+    ///
+    /// This constructor is primarily used for testing.
     #[must_use]
     #[allow(dead_code)]
     pub fn new(packages: Vec<Package>, permanent_excludes: &[String]) -> Self {
@@ -98,10 +101,7 @@ impl AppState {
         self.loading_state = LoadingState::NoUpdates;
     }
 
-    #[allow(dead_code)]
-    pub fn set_error<S: Into<String>>(&mut self, error: S) {
-        self.loading_state = LoadingState::Error(error.into());
-    }
+
 
     pub fn move_cursor_up(&mut self) {
         if self.cursor_position > 0 {
@@ -188,7 +188,9 @@ impl AppState {
         }
     }
 
-    /// Checks if there are any dependency conflicts
+    /// Checks if there are any dependency conflicts.
+    ///
+    /// This method is primarily used for testing.
     #[must_use]
     #[allow(dead_code)]
     pub fn has_conflicts(&self) -> bool {

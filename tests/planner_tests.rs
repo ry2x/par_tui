@@ -1,4 +1,4 @@
-use par_tui::core::planner::{UpdateMode, create_plan};
+use par_tui::core::planner::{create_plan, UpdateMode};
 use par_tui::models::config::Config;
 use par_tui::models::package::{Package, PackageRepository};
 
@@ -9,37 +9,6 @@ fn make_test_package(name: &str, repo: PackageRepository) -> Package {
         new_version: "2.0.0".to_string(),
         repository: repo,
     }
-}
-
-#[test]
-fn test_create_plan_entire_system() {
-    let packages = vec![
-        make_test_package("pkg1", PackageRepository::Official),
-        make_test_package("pkg2", PackageRepository::Aur),
-    ];
-
-    let plan = create_plan(UpdateMode::EntireSystem, packages.clone(), vec![]);
-
-    assert_eq!(plan.packages.len(), 2);
-    assert_eq!(plan.ignore_list.len(), 0);
-}
-
-#[test]
-fn test_create_plan_official_only() {
-    let packages = vec![
-        make_test_package("pkg1", PackageRepository::Official),
-        make_test_package("pkg2", PackageRepository::Aur),
-        make_test_package("pkg3", PackageRepository::Official),
-    ];
-
-    let plan = create_plan(UpdateMode::OfficialOnly, packages, vec![]);
-
-    assert_eq!(plan.packages.len(), 2);
-    assert!(
-        plan.packages
-            .iter()
-            .all(|p| p.repository == PackageRepository::Official)
-    );
 }
 
 #[test]
