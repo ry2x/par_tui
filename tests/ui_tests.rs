@@ -244,11 +244,10 @@ fn test_has_official_scan_failed_with_combined_failure() {
 
 #[test]
 fn test_scan_failure_marker_constants() {
-    use par_tui::io::terminal::{AUR_SCAN_FAILURE_MARKER, OFFICIAL_SCAN_FAILURE_MARKER};
+    use par_tui::io::terminal::OFFICIAL_SCAN_FAILURE_MARKER;
 
     // Verify constants are what we expect
     assert_eq!(OFFICIAL_SCAN_FAILURE_MARKER, "Official");
-    assert_eq!(AUR_SCAN_FAILURE_MARKER, "AUR");
 }
 
 // Phase 2: UI Integration Tests for dependency warnings

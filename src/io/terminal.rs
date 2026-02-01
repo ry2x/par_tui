@@ -20,7 +20,7 @@ use crate::ui::{
 pub use crate::ScanMessage;
 
 /// Scan failure marker constants (re-export from lib root)
-pub use crate::{AUR_SCAN_FAILURE_MARKER, OFFICIAL_SCAN_FAILURE_MARKER};
+pub use crate::OFFICIAL_SCAN_FAILURE_MARKER;
 
 /// Runs the TUI with async scanning and returns the user's selected action and final state.
 ///
