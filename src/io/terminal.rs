@@ -5,23 +5,22 @@ use crossterm::{
 };
 use ratatui::{Terminal, backend::CrosstermBackend};
 use std::io;
-use std::sync::mpsc::Receiver;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use std::sync::mpsc::Receiver;
 use std::time::Duration;
 
 use crate::models::config::Config;
 use crate::ui::{
     app::{AppState, UIEvent},
-    controller,
-    view,
+    controller, view,
 };
 
 /// Message types for scan thread communication (re-export from lib root)
 pub use crate::ScanMessage;
 
 /// Scan failure marker constants (re-export from lib root)
-pub use crate::{AUR_SCAN_FAILURE_MARKER, OFFICIAL_SCAN_FAILURE_MARKER};
+pub use crate::OFFICIAL_SCAN_FAILURE_MARKER;
 
 /// Runs the TUI with async scanning and returns the user's selected action and final state.
 ///
@@ -87,10 +86,9 @@ fn run_app_with_loading(
         // Poll for keyboard events with timeout
         if event::poll(Duration::from_millis(100))?
             && let Event::Key(key) = event::read()?
+            && let Some(event) = controller::handle_key_event(state, key.code)
         {
-            if let Some(event) = controller::handle_key_event(state, key.code) {
-                return Ok(Some(event));
-            }
+            return Ok(Some(event));
         }
     }
 }
