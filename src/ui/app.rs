@@ -101,8 +101,6 @@ impl AppState {
         self.loading_state = LoadingState::NoUpdates;
     }
 
-
-
     pub fn move_cursor_up(&mut self) {
         if self.cursor_position > 0 {
             self.cursor_position -= 1;

@@ -10,7 +10,10 @@ use models::package::Package;
 use parser::{pacman, paru, toml as toml_parser};
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Sender};
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 use std::thread::{self, JoinHandle};
 use ui::app::UIEvent;
 
