@@ -16,11 +16,11 @@ use crate::ui::{
     controller, view,
 };
 
-/// Message types for scan thread communication (re-export from lib root)
-pub use crate::ScanMessage;
+/// Message types for scan thread communication (re-export from app module)
+pub use crate::app::ScanMessage;
 
-/// Scan failure marker constants (re-export from lib root)
-pub use crate::OFFICIAL_SCAN_FAILURE_MARKER;
+/// Scan failure marker constants (re-export from app module)
+pub use crate::app::OFFICIAL_SCAN_FAILURE_MARKER;
 
 /// Runs the TUI with async scanning and returns the user's selected action and final state.
 ///
